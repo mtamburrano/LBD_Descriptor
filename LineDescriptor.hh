@@ -1,9 +1,41 @@
-/*
- * LineDescriptor.hh
- *
- *  Created on: Dec 12, 2011
- *      Author: lz
- */
+/*IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
+
+ By downloading, copying, installing or using the software you agree to this license.
+ If you do not agree to this license, do not download, install,
+ copy or use the software.
+
+
+                          License Agreement
+               For Open Source Computer Vision Library
+
+Copyright (C) 2011-2012, Lilian Zhang, all rights reserved.
+Copyright (C) 2013, Manuele Tamburrano, Stefano Fabri, all rights reserved.
+Third party copyrights are property of their respective owners.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+  * Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+
+  * The name of the copyright holders may not be used to endorse or promote products
+    derived from this software without specific prior written permission.
+
+This software is provided by the copyright holders and contributors "as is" and
+any express or implied warranties, including, but not limited to, the implied
+warranties of merchantability and fitness for a particular purpose are disclaimed.
+In no event shall the Intel Corporation or contributors be liable for any direct,
+indirect, incidental, special, exemplary, or consequential damages
+(including, but not limited to, procurement of substitute goods or services;
+loss of use, data, or profits; or business interruption) however caused
+and on any theory of liability, whether in contract, strict liability,
+or tort (including negligence or otherwise) arising in any way out of
+the use of this software, even if advised of the possibility of such damage.
+*/
 
 #ifndef LINEDESCRIPTOR_HH_
 #define LINEDESCRIPTOR_HH_
@@ -11,8 +43,8 @@
 
 #include "EDLineDetector.hh"
 #include "LineStructure.hh"
-#include <Filter/Gauss.hh>
-#include <Filter/Rescale.hh>
+
+
 #include <map>
 struct OctaveLine{
   unsigned int octaveCount;//the octave which this line is detected
@@ -34,8 +66,8 @@ public:
 		NNDR=1//nearest/next ratio
 	};
   /*This function is used to detect lines from multi-scale images.*/
-	int OctaveKeyLines(BIAS::Image<unsigned char> & image, ScaleLines &keyLines);
-  int GetLineDescriptor(BIAS::Image<unsigned char> & image,
+	int OctaveKeyLines(cv::Mat & image, ScaleLines &keyLines);
+  int GetLineDescriptor(cv::Mat & image,
   		ScaleLines &keyLines);
   int MatchLineByDescriptor(ScaleLines &keyLinesLeft, ScaleLines &keyLinesRight,
   		std::vector<short> &matchLeft, std::vector<short> &matchRight,
@@ -55,6 +87,17 @@ private:
 			ogray[j*swidth + i] = igray[(int)((float) j * factor) * width + (int) ((float) i*factor)];
 
 	}
+	void sampleUchar(uchar *igray,uchar *ogray, float factor, int width, int height)
+    {
+
+        int swidth = (int)((float) width / factor);
+        int sheight = (int)((float) height / factor);
+
+        for(int j=0; j < sheight; j++)
+         for(int i=0; i < swidth; i++)
+            ogray[j*swidth + i] = igray[(int)((float) j * factor) * width + (int) ((float) i*factor)];
+
+    }
 	/*Compute the line descriptor of input line set. This function should be called
 	 *after OctaveKeyLines() function; */
 	int ComputeLBD_(ScaleLines &keyLines);

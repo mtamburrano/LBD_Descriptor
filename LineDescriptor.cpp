@@ -1,22 +1,49 @@
-/*
- * LineDescriptor.cpp
- *
- *  Created on: Dec 12, 2011
- *      Author: lz
- */
+/*IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
+
+ By downloading, copying, installing or using the software you agree to this license.
+ If you do not agree to this license, do not download, install,
+ copy or use the software.
+
+
+                          License Agreement
+               For Open Source Computer Vision Library
+
+Copyright (C) 2011-2012, Lilian Zhang, all rights reserved.
+Copyright (C) 2013, Manuele Tamburrano, Stefano Fabri, all rights reserved.
+Third party copyrights are property of their respective owners.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+  * Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+
+  * The name of the copyright holders may not be used to endorse or promote products
+    derived from this software without specific prior written permission.
+
+This software is provided by the copyright holders and contributors "as is" and
+any express or implied warranties, including, but not limited to, the implied
+warranties of merchantability and fitness for a particular purpose are disclaimed.
+In no event shall the Intel Corporation or contributors be liable for any direct,
+indirect, incidental, special, exemplary, or consequential damages
+(including, but not limited to, procurement of substitute goods or services;
+loss of use, data, or profits; or business interruption) however caused
+and on any theory of liability, whether in contract, strict liability,
+or tort (including negligence or otherwise) arising in any way out of
+the use of this software, even if advised of the possibility of such damage.
+*/
 
 #include "LineDescriptor.hh"
-#include <cv.h>
-#include <highgui.h>
-#include "opencv2/features2d/features2d.hpp"
-#include <Base/Debug/TimeMeasure.hh>
-#include <time.h>
+
 #define SalienceScale 0.9//0.9
 
 //#define DEBUGLinesInOctaveImages
 
 using namespace std;
-using namespace BIAS;
 
 LineDescriptor::LineDescriptor()
 {
@@ -100,106 +127,45 @@ LineDescriptor::~LineDescriptor(){
 /*Line detection method: element in keyLines[i] includes a set of lines which is the same line
  * detected in different octave images.
  */
-int LineDescriptor::OctaveKeyLines(BIAS::Image<unsigned char> & image, ScaleLines &keyLines)
+int LineDescriptor::OctaveKeyLines(cv::Mat & image, ScaleLines &keyLines)
 {
 	unsigned int numOfFinalLine = 0;
-#ifdef DEBUGLinesInOctaveImages
-		BIAS::TimeMeasure timer;
-#endif
-	BIAS::Image<float> img;
-	BIAS::ImageConvert::ConvertST(image,img, BIAS::ImageBase::ST_float);//copy the input image
+	
 	float preSigma2 = 0;//orignal image is not blurred, has zero sigma;
 	float curSigma2 = 1.0;//[sqrt(2)]^0=1;
 	float factor = sqrt(2);//the down sample factor between connective two octave images
-	BIAS::Gauss<float, float> theGauss;
-	//BIAS::Rescale<float, float> theScale;
-	//theScale.SetBorderHandling(BIAS::FilterBase<float,float>::TBH_full);
+	
 	for(unsigned int octaveCount = 0; octaveCount<numOfOctave_; octaveCount++){
-#ifdef DEBUGLinesInOctaveImages
-		timer.Start();
-#endif
-		BIAS::Image<float> blur;
+	    
+	    cv::Mat blur;
 		/* Form each level by adding incremental blur from previous level.
 		 * curSigma = [sqrt(2)]^octaveCount;
 		 * increaseSigma^2 = curSigma^2 - preSigma^2 */
 		float increaseSigma = sqrt(curSigma2-preSigma2);
-		theGauss.SetSigma(increaseSigma);
 		switch(ksize_){
-		case 3: theGauss.Filter3x3Grey(img, blur); break;
-		case 5: theGauss.Filter5x5Grey(img, blur); break;
-		case 7: theGauss.Filter7x7Grey(img, blur); break;
-		case 9: theGauss.Filter9x9Grey(img, blur); break;
-		case 11: theGauss.Filter11x11Grey(img, blur); break;
-		default: theGauss.Filter5x5Grey(img, blur); break;
+            case 3: cv::GaussianBlur(image, blur, cv::Size(3,3), increaseSigma); break;
+            case 5: cv::GaussianBlur(image, blur, cv::Size(5,5), increaseSigma); break;
+            case 7: cv::GaussianBlur(image, blur, cv::Size(7,7), increaseSigma); break;
+            case 9: cv::GaussianBlur(image, blur, cv::Size(9,9), increaseSigma); break;
+            case 11: cv::GaussianBlur(image, blur, cv::Size(11,11), increaseSigma); break;
+            default: cv::GaussianBlur(image, blur, cv::Size(5,5), increaseSigma); break;
+
 		}
 
+
 		//detect line for each octave image;
-		BIAS::Image<unsigned char> blurUChar;
-		BIAS::ImageConvert::ConvertST(blur,blurUChar,BIAS::ImageBase::ST_unsignedchar);
-		if(!edLineVec_[octaveCount]->EDline(blurUChar,true)){
+		if(!edLineVec_[octaveCount]->EDline(blur,true)){
 			return -1;
 		}
 		numOfFinalLine += edLineVec_[octaveCount]->lines_.numOfLines;
-#ifdef DEBUGLinesInOctaveImages
-		timer.Stop();
-		cout<<"Octave "<<octaveCount<<", line num = "<<edLineVec_[octaveCount]->lines_.numOfLines <<", Time to detect line "<<endl;
-		timer.Print();
-		timer.Reset();
-		////////////////////////////////////
 
-		//the following code is to show the detected lines for each octave image
-		IplImage* cvImg = cvCreateImage(cvSize(blur.GetWidth(),blur.GetHeight()),IPL_DEPTH_32F, 1);
-		IplImage* cvColorImg = cvCreateImage(cvSize(blur.GetWidth(),blur.GetHeight()),IPL_DEPTH_32F, 3);
-		float *newImageData = (float*) cvImg->imageDataOrigin;
-		memcpy(newImageData, blur.GetImageData(), cvImg->imageSize);
-		cvCvtColor( cvImg, cvColorImg,  CV_GRAY2RGB );
-		CvScalar s;
-		s.val[0] = 0; s.val[1] = 250;  s.val[2] = 0;
-		CvPoint point;
-		CvFont  font;
-		cvInitFont(&font,CV_FONT_HERSHEY_DUPLEX ,1.0,1.0,0,1);
-		unsigned int *pLineXCors = edLineVec_[octaveCount]->lines_.xCors.data();
-		unsigned int *pLineYCors = edLineVec_[octaveCount]->lines_.yCors.data();
-		unsigned int *pLineSID   = edLineVec_[octaveCount]->lines_.sId.data();
-		unsigned int offsetInLineArray;
-		for(unsigned int i=0; i<edLineVec_[octaveCount]->lines_.numOfLines; i++){
-			for(offsetInLineArray = pLineSID[i]; offsetInLineArray < pLineSID[i+1]; offsetInLineArray++){
-				cvSet2D(cvColorImg,pLineYCors[offsetInLineArray],pLineXCors[offsetInLineArray],s);
-			}
-			//			char buf[10];
-			//			sprintf( buf,   "%d ",  i);
-			//			point = cvPoint(round(0.5*edLineVec_[octaveCount].lineEndpoints_[i][0]+0.5*edLineVec_[octaveCount].lineEndpoints_[i][2]),
-			//					round(0.5*edLineVec_[octaveCount].lineEndpoints_[i][1]+0.5*edLineVec_[octaveCount].lineEndpoints_[i][3]));
-			//			cvPutText(cvColorImg,buf,point,&font,CV_RGB(255,0,0));
-		}
-		ostringstream imagename;
-		imagename<<"cvImage"<<octaveCount<<".png";
-		cvSaveImage(imagename.str().c_str(),cvColorImg);
-		cvReleaseImage(&cvImg);
-		cvReleaseImage(&cvColorImg);
-//		if(octaveCount==0){//store the dxImage and dyImage to disk for debugging.
-//			BIAS::Matrix<short> dxImg(blur.GetHeight(),blur.GetWidth()), dyImg(blur.GetHeight(),blur.GetWidth());
-//			short *pdxImg = edLineVec_[octaveCount]->dxImg_->data.s;
-//			short *pdyImg = edLineVec_[octaveCount]->dyImg_->data.s;
-//			short *pdxMat = dxImg.GetData();
-//			short *pdyMat = dyImg.GetData();
-//			unsigned int size = blur.GetHeight()*blur.GetWidth()*sizeof(short);
-//			memcpy(pdxMat,pdxImg,size);
-//			memcpy(pdyMat,pdyImg,size);
-//			dxImg.Save("dxImage.txt");
-//			dyImg.Save("dyImage.txt");
-//		}
-#endif
 		////////////////////////////////////
 		//down sample the current octave image to get the next octave image
-		img.Init((int)((float) blur.GetWidth() / factor), (int)((float) blur.GetHeight() / factor),1);
-		sample(blur.GetImageData(),img.GetImageData(), factor, blur.GetWidth(),  blur.GetHeight());
+		image.create((int)(blur.rows/factor), (int)(blur.cols/factor), CV_8UC1);
+		sampleUchar(blur.data,image.data, factor, blur.cols,  blur.rows);
 		preSigma2 = curSigma2;
 		curSigma2 = curSigma2*2;
 	}
-#ifdef DEBUGLinesInOctaveImages
-	timer.Start();
-#endif
 	/*lines which correspond to the same line in the octave images will be stored in the same element of ScaleLines.*/
 	std::vector<OctaveLine> octaveLines(numOfFinalLine);//store the lines in OctaveLine structure
 	numOfFinalLine = 0;//store the number of finally accepted lines in ScaleLines
@@ -392,78 +358,6 @@ int LineDescriptor::OctaveKeyLines(BIAS::Image<unsigned char> & image, ScaleLine
 	}
 
 	////////////////////////////////////
-#ifdef DEBUGLinesInOctaveImages
-	//the following code is to show lines in ScaleLines
-	timer.Stop();
-	cout<<"number of final lines = "<<numOfFinalLine<<", number of lines in ScaleLines vector="<<lineIDInScaleLineVec
-	<<", Time to find extreme lines is "<<endl;
-	timer.Print();
-	timer.Reset();
-	//generate the color;
-	short *r = new short[lineIDInScaleLineVec];
-	short *g = new short[lineIDInScaleLineVec];
-	short *b = new short[lineIDInScaleLineVec];
-	int lowest=10, highest=255;
-	int range=(highest-lowest)+1;
-	for(int i=0; i <lineIDInScaleLineVec; i++){
-		r[i] = lowest+int(rand()%range);
-		g[i] = lowest+int(rand()%range);
-		b[i] = lowest+int(rand()%range);
-	}
-
-	unsigned int offsetInLineArray;
-	unsigned int lineID = 0;
-	CvPoint startPoint;
-	CvPoint endPoint;
-	CvFont  font;
-	cvInitFont(&font,CV_FONT_HERSHEY_DUPLEX,2.0,1.6,0.2,2,8);
-	CvMat* cvImage = cvCreateMat(image.GetHeight(), image.GetWidth(),CV_8UC1);
-	CvMat* cvColorImage = cvCreateMat(image.GetHeight(), image.GetWidth(),CV_8UC3);
-	memcpy(cvImage->data.ptr, image.GetImageData(), image.GetHeight()*image.GetWidth()*sizeof(unsigned char));
-	cvCvtColor( cvImage, cvColorImage,  CV_GRAY2RGB );
-	for(unsigned int octaveCount = 0; octaveCount<numOfOctave_; octaveCount++){
-		unsigned int *pLineXCors = edLineVec_[octaveCount]->lines_.xCors.data();
-		unsigned int *pLineYCors = edLineVec_[octaveCount]->lines_.yCors.data();
-		unsigned int *pLineSID   = edLineVec_[octaveCount]->lines_.sId.data();
-		ostringstream imagename;
-		imagename<<"cvImage"<<octaveCount<<".png";
-		IplImage* cvFinalImg = cvLoadImage(imagename.str().c_str());
-		CvScalar s;
-		tempValue = scale[octaveCount];
-		while(lineID<numOfFinalLine&&octaveLines[lineID].octaveCount==octaveCount){
-			tempID = octaveLines[lineID].lineIDInScaleLineVec;
-			s.val[0] = b[tempID]; s.val[1] = g[tempID];  s.val[2] = r[tempID];
-			lineIDInOctave = octaveLines[lineID].lineIDInOctave;
-			offsetInLineArray = pLineSID[lineIDInOctave];
-			startPoint = cvPoint(pLineXCors[offsetInLineArray],pLineYCors[offsetInLineArray]);
-			for(; offsetInLineArray < pLineSID[lineIDInOctave+1]; offsetInLineArray++){
-				cvSet2D(cvFinalImg,pLineYCors[offsetInLineArray],pLineXCors[offsetInLineArray],s);
-				cvSet2D(cvColorImage,pLineYCors[offsetInLineArray]*tempValue,pLineXCors[offsetInLineArray]*tempValue,s);
-			}
-			char buf[10];
-			sprintf( buf,   "%d ",  octaveLines[lineID].lineIDInOctave);
-			cvPutText(cvFinalImg,buf,startPoint,&font,CV_RGB(r[tempID],g[tempID],b[tempID]));
-//			startPoint = cvPoint(int(keyLines[lineID].sPointInOctaveX),int(keyLines[lineID].sPointInOctaveY));
-//			endPoint   = cvPoint(int(keyLines[lineID].ePointInOctaveX),int(keyLines[lineID].ePointInOctaveY));
-//			cvLine( cvFinalImg,startPoint,endPoint,CV_RGB(250,0,0));
-//			startPoint = cvPoint(int(keyLines[lineID].startPointX),int(keyLines[lineID].startPointY));
-//			endPoint   = cvPoint(int(keyLines[lineID].endPointX),int(keyLines[lineID].endPointY));
-//			cvLine( cvColorImage,startPoint,endPoint,CV_RGB(250,0,0));
-			lineID++;
-		}
-		cvSaveImage(imagename.str().c_str(),cvFinalImg);
-		cvReleaseImage(&cvFinalImg);
-	}
-  cvNamedWindow("LineColorImage", CV_WINDOW_AUTOSIZE);
-  cvShowImage("LineColorImage", cvColorImage);
-  cvSaveImage("cvImageAll.png",cvColorImage);
-  cvWaitKey(0);
-  delete [] r;
-  delete [] g;
-  delete [] b;
-  cvReleaseMat(&cvImage);
-  cvReleaseMat(&cvColorImage);
-#endif
 
   delete [] scale;
   return 1;
@@ -522,8 +416,8 @@ int LineDescriptor::ComputeLBD_(ScaleLines &keyLines)
 		for(short lineIDInSameLine = 0; lineIDInSameLine<sameLineSize; lineIDInSameLine++){
 			pSingleLine = &(keyLines[lineIDInScaleVec][lineIDInSameLine]);
 			octaveCount = pSingleLine->octaveCount;
-			pdxImg = edLineVec_[octaveCount]->dxImg_->data.s;
-			pdyImg = edLineVec_[octaveCount]->dyImg_->data.s;
+			pdxImg = edLineVec_[octaveCount]->dxImg_.ptr<short>();
+			pdyImg = edLineVec_[octaveCount]->dyImg_.ptr<short>();
 			realWidth = edLineVec_[octaveCount]->imageWidth;
 			imageWidth  = realWidth -1;
 			imageHeight = edLineVec_[octaveCount]->imageHeight-1;
@@ -729,24 +623,16 @@ int LineDescriptor::ComputeLBD_(ScaleLines &keyLines)
 
 
 
-int LineDescriptor::GetLineDescriptor(BIAS::Image<unsigned char> & image, ScaleLines &keyLines)
+int LineDescriptor::GetLineDescriptor(cv::Mat & image, ScaleLines & keyLines)
 {
-	if(!OctaveKeyLines(image,keyLines)){
-		cout<<"OctaveKeyLines failed"<<endl;
-		return -1;
-	}
+    if(!OctaveKeyLines(image,keyLines)){
+        cout<<"OctaveKeyLines failed"<<endl;
+        return -1;
+    }
 
-//	BIAS::TimeMeasure timer;
-//	timer.Start();
-	ComputeLBD_(keyLines);
-//	timer.Stop();
-//	cout<<"Time to compute line descriptors is "<<endl;
-//	timer.Print();
-//	timer.Reset();
-	return 1;
+    ComputeLBD_(keyLines);
+    return 1;
 }
-
-
 
 /*Match line by their descriptors.
  *The function will use opencv FlannBasedMatcher to mathc lines. */
@@ -799,25 +685,4 @@ int LineDescriptor::MatchLineByDescriptor(ScaleLines &keyLinesLeft, 	ScaleLines 
 		}// end for(int idL=0; idL<leftSize; idL++)
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

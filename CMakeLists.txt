@@ -1,5 +1,5 @@
-INCLUDE_DIRECTORIES(/data1/lz/LilianTests/ARPACKLAB/arpack++/include/)
-INCLUDE_DIRECTORIES(/data1/lz/LilianTests/ARPACKLAB/arpack++)
+#INCLUDE_DIRECTORIES(/usr/include/arpack++/include/)
+#INCLUDE_DIRECTORIES(/usr/include/arpack++)
 
 #project name
 PROJECT(LILIANTESTS)
@@ -15,35 +15,28 @@ SET(BUILD_SHARED_LIBS ON)
 ## where are user-specific cmake modules
 SET(CMAKE_MODULE_PATH $ENV{CMAKE_MODULE_PATH})
 
-OPTION(USE_BIAS OFF)
-
-IF(USE_BIAS)
-FIND_PACKAGE(BIAS)
-IF(BIAS_FOUND)
-  INCLUDE(${BIAS_USE_FILE})
-ELSE(BIAS_FOUND)
-  MESSAGE(SEND_ERROR "BIAS lib not found.")
-ENDIF(BIAS_FOUND)
-ENDIF(USE_BIAS)
+#OPTION(USE_BIAS OFF)
 
 
-IF(USE_BIAS)
-INCLUDE_DIRECTORIES(${BIAS_INCLUDE_DIR} ${BIAS_INCLUDE_DIR}/BIAS ${WXWIDGETS_INCLUDE_DIR})
-LINK_DIRECTORIES( ${BIAS_LINK_DIRECTORIES})
-ENDIF(USE_BIAS)
+#IF(USE_BIAS)
+#INCLUDE_DIRECTORIES(${BIAS_INCLUDE_DIR} /usr/local/include/BIAS /usr/include/ImageMagick /usr/local/include/opencv2 ${WXWIDGETS_INCLUDE_DIR})
+#LINK_DIRECTORIES( ${BIAS_LINK_DIRECTORIES})
+#ENDIF(USE_BIAS)
   
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${BIAS_CXX_FLAGS}")
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  ${BIAS_C_FLAGS}")
+#SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${BIAS_CXX_FLAGS} -O0 -ggdb -std=c++11")
+#SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  ${BIAS_C_FLAGS} -O0 -ggdb -std=c++11")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c++11")
 
 # source files of library "LineMatchingLib" to be created
 SET(LineMatchingLib_SRCS
-    PairwiseLineMatching.cpp
+    #PairwiseLineMatching.cpp
     LineDescriptor.cpp
     EDLineDetector.cpp
 )
 # header files to be installed
 SET(LineMatchingLib_HEADER
-    PairwiseLineMatching.hh
+    #PairwiseLineMatching.hh
     LineDescriptor.hh
     EDLineDetector.hh
     LineStructure.hh
@@ -53,10 +46,11 @@ SET(LineMatchingLib_HEADER
 ADD_LIBRARY(LineMatchingLib
             ${LineMatchingLib_SRCS}
             ${LineMatchingLib_HEADER})
-TARGET_LINK_LIBRARIES(LineMatchingLib  arpack /data1/lz/LilianTests/ARPACKLAB/SuperLU/libsuperlu.so  ${BIAS_LIBRARIES}) 
+#TARGET_LINK_LIBRARIES(LineMatchingLib  arpack /usr/lib/libsuperlu.so  BIASImageBaseD opencv_core opencv_highgui opencv_imgproc BIASDebugD BIASMathAlgoD BIASMathBaseD BIASFilterD arpack++) 
+TARGET_LINK_LIBRARIES(LineMatchingLib opencv_core opencv_highgui opencv_imgproc) 
 
 
 ADD_EXECUTABLE(TestLineMatchingAlgorithm TestLineMatchingAlgorithm.cpp)
-TARGET_LINK_LIBRARIES(TestLineMatchingAlgorithm   LineMatchingLib)
+TARGET_LINK_LIBRARIES(TestLineMatchingAlgorithm   LineMatchingLib )
 
 

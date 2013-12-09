@@ -1,12 +1,44 @@
-/*
- * EDLineDetector.cpp
- *
- *  Created on: Nov 30, 2011
- *      Author: lz
- */
+/*IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
+
+ By downloading, copying, installing or using the software you agree to this license.
+ If you do not agree to this license, do not download, install,
+ copy or use the software.
+
+
+                          License Agreement
+               For Open Source Computer Vision Library
+
+Copyright (C) 2011-2012, Lilian Zhang, all rights reserved.
+Copyright (C) 2013, Manuele Tamburrano, Stefano Fabri, all rights reserved.
+Third party copyrights are property of their respective owners.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+  * Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+
+  * The name of the copyright holders may not be used to endorse or promote products
+    derived from this software without specific prior written permission.
+
+This software is provided by the copyright holders and contributors "as is" and
+any express or implied warranties, including, but not limited to, the implied
+warranties of merchantability and fitness for a particular purpose are disclaimed.
+In no event shall the Intel Corporation or contributors be liable for any direct,
+indirect, incidental, special, exemplary, or consequential damages
+(including, but not limited to, procurement of substitute goods or services;
+loss of use, data, or profits; or business interruption) however caused
+and on any theory of liability, whether in contract, strict liability,
+or tort (including negligence or otherwise) arising in any way out of
+the use of this software, even if advised of the possibility of such damage.
+*/
+
+
 #include "EDLineDetector.hh"
-#include <highgui.h>
-#include <Base/Debug/TimeMeasure.hh>
 
 #define Horizontal  1//if |dx|<|dy|;
 #define Vertical    2//if |dy|<=|dx|;
@@ -17,19 +49,17 @@
 #define TryTime     6
 #define SkipEdgePoint 2
 
-
 //#define DEBUGEdgeDrawing
 //#define DEBUGEDLine
 
 using namespace std;
-using namespace BIAS;
 EDLineDetector::EDLineDetector()
 {
 	//	cout<<"Call EDLineDetector constructor function"<<endl;
 	//set parameters for line segment detection
 	ksize_ = 5;
 	sigma_ = 1.0;
-	gradienThreshold_ = 25;
+	gradienThreshold_ = 80; // ***** ORIGINAL WAS 25
 	anchorThreshold_  = 2;//8
 	scanIntervals_    = 2;//2
 	minLineLen_       = 15;
@@ -51,18 +81,18 @@ EDLineDetector::EDLineDetector(EDLineParam param)
 void EDLineDetector::InitEDLine_()
 {
 	bValidate_           = true;
-	ATA.newsize(2,2);
-	ATV.newsize(2);
-	tempMatLineFit.newsize(2,2);
-	tempVecLineFit.newsize(2);
-	fitMatT.newsize(2,minLineLen_);
-	fitVec.newsize(minLineLen_);
+	ATA = cv::Mat_<int>(2,2);
+	ATV = cv::Mat_<int>(1,2);
+	tempMatLineFit = cv::Mat_<int>(2,2);
+	tempVecLineFit = cv::Mat_<int>(1,2);
+	fitMatT = cv::Mat_<int>(2,minLineLen_);
+	fitVec = cv::Mat_<int>(1,minLineLen_);
 	for(int i=0; i<minLineLen_; i++){
 		fitMatT[1][i] = 1;
 	}
-	dxImg_ = cvCreateMat( 1, 1, CV_16SC1 );
-	dyImg_ = cvCreateMat( 1, 1, CV_16SC1 );
-	gImgWO_= cvCreateMat( 1, 1, CV_8SC1 );
+	dxImg_.create( 1, 1, CV_16SC1 );
+	dyImg_.create( 1, 1, CV_16SC1 );
+	gImgWO_.create( 1, 1, CV_8SC1 );
 	pFirstPartEdgeX_ = NULL;
 	pFirstPartEdgeY_ = NULL;
 	pFirstPartEdgeS_ = NULL;
@@ -73,12 +103,6 @@ void EDLineDetector::InitEDLine_()
 	pAnchorY_ = NULL;
 }
 EDLineDetector::~EDLineDetector(){
-	//	cout<<"Call EDLineDetector destructor function"<<endl;
-	if(dxImg_->step>0){
-		cvReleaseMat( &dxImg_);
-		cvReleaseMat( &dyImg_);
-		cvReleaseMat( &gImgWO_);
-	}
 	if(pFirstPartEdgeX_!=NULL){
 		delete [] pFirstPartEdgeX_;
 		delete [] pFirstPartEdgeY_;
@@ -93,43 +117,35 @@ EDLineDetector::~EDLineDetector(){
 	}
 }
 
-int EDLineDetector::EdgeDrawing(BIAS::Image<unsigned char> &image, EdgeChains &edgeChains, bool smoothed )
+int EDLineDetector::EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smoothed )
 {
-#ifdef DEBUGEdgeDrawing
-	BIAS::TimeMeasure timer;
-	timer.Start();
-#endif
-	if(image.GetChannelCount()>1){
-		cout<<"EDLineDetector->EdgeDrawing() error: image channel > 1"<<endl;
-		return -1;
-	}
-
-	imageWidth = image.GetWidth();
-	imageHeight= image.GetHeight();
+	imageWidth = image.cols;
+	imageHeight= image.rows;
 	unsigned int pixelNum = imageWidth*imageHeight;
 
-	CvMat* cvImage = cvCreateMat( imageHeight, imageWidth, CV_8UC1);
+    #ifdef DEBUGEdgeDrawing
+        cv::imshow("prima blur", image);
+    #endif
 	if(!smoothed){//input image hasn't been smoothed.
-		CvMat* cvInImage;
-		cvInImage = cvCreateMat( imageHeight, imageWidth, CV_8UC1);
-		unsigned char *pImage = image.GetImageData();
-		memcpy(cvInImage->data.ptr, pImage, pixelNum*sizeof(unsigned char));
-		cvSmooth( cvInImage, cvImage, CV_GAUSSIAN, ksize_, ksize_, sigma_);
-		cvReleaseMat(&cvInImage);
-	}else{
-		unsigned char *pImage = image.GetImageData();
-		memcpy(cvImage->data.ptr, pImage, pixelNum*sizeof(unsigned char));
+	    cv::Mat InImage = image.clone();
+	    cv::GaussianBlur(InImage, image, cv::Size(ksize_,ksize_), sigma_);
 	}
+	
+	#ifdef DEBUGEdgeDrawing
+	    cv::imshow("dopo blur", image);
+	    cv::waitKey();
+	#endif
+	
+	//Is this useful? Doesn't seem to have references
+	//else{
+//		unsigned char *pImage = image.GetImageData();
+//		memcpy(cvImage->data.ptr, pImage, pixelNum*sizeof(unsigned char));
+//	}
 
 	unsigned int edgePixelArraySize = pixelNum/5;
 	unsigned int maxNumOfEdge = edgePixelArraySize/20;
 	//compute dx, dy images
-	if(gImg_.GetWidth()!= imageWidth||gImg_.GetHeight()!= imageHeight){
-		if(dxImg_->step>0){
-			cvReleaseMat( &dxImg_);
-			cvReleaseMat( &dyImg_);
-			cvReleaseMat( &gImgWO_);
-		}
+	if(gImg_.cols!= imageWidth||gImg_.rows!= imageHeight){
 		if(pFirstPartEdgeX_!= NULL){
 			delete [] pFirstPartEdgeX_;
 			delete [] pFirstPartEdgeY_;
@@ -140,12 +156,12 @@ int EDLineDetector::EdgeDrawing(BIAS::Image<unsigned char> &image, EdgeChains &e
 			delete [] pAnchorX_;
 			delete [] pAnchorY_;
 		}
-		dxImg_ = cvCreateMat( imageHeight, imageWidth, CV_16SC1 );
-		dyImg_ = cvCreateMat( imageHeight, imageWidth, CV_16SC1 );
-		gImgWO_ = cvCreateMat( imageHeight, imageWidth, CV_8SC1 );
-		gImg_.Init(imageWidth,imageHeight,1);
-		dirImg_.Init(imageWidth,imageHeight,1);
-		edgeImage_.Init(imageWidth,imageHeight,1);
+		dxImg_.create(imageHeight, imageWidth, CV_16SC1);
+		dyImg_.create(imageHeight, imageWidth, CV_16SC1 );
+		gImgWO_.create(imageHeight, imageWidth, CV_8SC1 );
+		gImg_.create(imageHeight, imageWidth, CV_8UC1 );
+		dirImg_.create(imageHeight, imageWidth, CV_8UC1 );
+		edgeImage_.create(imageHeight, imageWidth, CV_8UC1 );
 		pFirstPartEdgeX_ = new unsigned int[edgePixelArraySize];
 		pFirstPartEdgeY_ = new unsigned int[edgePixelArraySize];
 		pSecondPartEdgeX_ = new unsigned int[edgePixelArraySize];
@@ -155,23 +171,22 @@ int EDLineDetector::EdgeDrawing(BIAS::Image<unsigned char> &image, EdgeChains &e
 		pAnchorX_ = new unsigned int[edgePixelArraySize];
 		pAnchorY_ = new unsigned int[edgePixelArraySize];
 	}
-	cvSobel( cvImage, dxImg_, 1, 0, 3);
-	cvSobel( cvImage, dyImg_, 0, 1, 3);
+	cv::Sobel( image, dxImg_, CV_16SC1, 1, 0, 3);
+	cv::Sobel( image, dyImg_, CV_16SC1, 0, 1, 3);
 
 
-#ifdef DEBUGEdgeDrawing
-	timer.Stop();
-	cout<<"smooth image and get dx_dy image"<<endl;
-	timer.Print();
-	timer.Reset();
-	timer.Start();
-#endif
+    #ifdef DEBUGEdgeDrawing
+        cv::imshow("dxImg_", dxImg_);
+        cv::imshow("dyImg_", dyImg_);
+        cv::waitKey();
+    #endif
+	
 	//compute gradient and direction images
-	short *pdxImg = dxImg_->data.s;
-	short *pdyImg = dyImg_->data.s;
-	unsigned char *pgImgWO = gImgWO_->data.ptr;
-	unsigned char *pgImg  = gImg_.GetImageData();
-	unsigned char *pdirImg = dirImg_.GetImageData();
+	short *pdxImg = dxImg_.ptr<short>();
+	short *pdyImg = dyImg_.ptr<short>();
+	unsigned char *pgImgWO = gImgWO_.ptr();
+	unsigned char *pgImg  = gImg_.ptr();
+	unsigned char *pdirImg = dirImg_.ptr();
 	short dxABS, dyABS, dxAdy;
 	unsigned char temp;
 	for(int i=0; i<pixelNum; i++){
@@ -195,18 +210,11 @@ int EDLineDetector::EdgeDrawing(BIAS::Image<unsigned char> &image, EdgeChains &e
 		}
 	}
 
-	pdxImg = dxImg_->data.s;
-	pdyImg = dyImg_->data.s;
-	pgImg  = gImg_.GetImageData();
-	pdirImg = dirImg_.GetImageData();
-#ifdef DEBUGEdgeDrawing
-	timer.Stop();
-	cout<<"get gradient image and direction image"<<endl;
-//	BIAS::ImageIO::Save("gImg_.png",gImg_);
-	timer.Print();
-	timer.Reset();
-	timer.Start();
-#endif
+	pdxImg = dxImg_.ptr<short>();
+	pdyImg = dyImg_.ptr<short>();
+	pgImg  = gImg_.data;
+	pdirImg = dirImg_.data;
+	
 	//extract the anchors in the gradient image, store into a vector
 	memset(pAnchorX_,  0, edgePixelArraySize*sizeof(unsigned int));//initialization
 	memset(pAnchorY_,  0, edgePixelArraySize*sizeof(unsigned int));
@@ -240,18 +248,11 @@ int EDLineDetector::EdgeDrawing(BIAS::Image<unsigned char> &image, EdgeChains &e
 		return -1;
 	}
 #ifdef DEBUGEdgeDrawing
-	timer.Stop();
 	cout<<"Anchor point detection, anchors.size="<<anchorsSize<<endl;
-//	for(unsigned int i=0; i<anchorsSize; i++){
-//		cout<<"pAnchorX_ = "<<pAnchorX_[i]<<", pAnchorY_ = "<<pAnchorY_[i]<<endl;
-//	}
-	timer.Print();
-	timer.Reset();
-	timer.Start();
 #endif
 	//link the anchors by smart routing
-	edgeImage_.SetZero();
-	unsigned char *pEdgeImg = edgeImage_.GetImageData();
+	edgeImage_.setTo(0);
+	unsigned char *pEdgeImg = edgeImage_.data;
 	memset(pFirstPartEdgeX_,  0, edgePixelArraySize*sizeof(unsigned int));//initialization
 	memset(pFirstPartEdgeY_,  0, edgePixelArraySize*sizeof(unsigned int));
 	memset(pSecondPartEdgeX_, 0, edgePixelArraySize*sizeof(unsigned int));
@@ -771,46 +772,39 @@ int EDLineDetector::EdgeDrawing(BIAS::Image<unsigned char> &image, EdgeChains &e
 	psId[numOfEdges] = indexInCors;//the end index of the last edge
 	edgeChains.numOfEdges = numOfEdges;
 
-#ifdef DEBUGEdgeDrawing
-	timer.Stop();
-	cout<<"Edge Drawing, numofedge = "<<numOfEdges <<endl;
-	timer.Print();
-	timer.Reset();
-	/*Show the extracted edge cvImage in color. Each chain is in different color.*/
-	IplImage* cvColorImg = cvCreateImage(cvSize(imageWidth,imageHeight),IPL_DEPTH_8U, 3);
-	cvSet(cvColorImg, cvScalar(0,0,0));
-	CvScalar s;
-	srand((unsigned)time(0));
-
-	int lowest=100, highest=255;
-	int range=(highest-lowest)+1;
-	int r, g, b; //the color of lines
-	for(unsigned int i=0; i<edgeChains.numOfEdges; i++){
-		r = lowest+int(rand()%range);
-		g = lowest+int(rand()%range);
-		b = lowest+int(rand()%range);
-		s.val[0] = r; s.val[1] = g;  s.val[2] = b;
-		for(indexInCors = psId[i]; indexInCors<psId[i+1]; indexInCors++){
-			cvSet2D(cvColorImg,pyCors[indexInCors],pxCors[indexInCors],s);
-		}
-	}
-
-	cvNamedWindow("EdgeColorImage", CV_WINDOW_AUTOSIZE);
-	cvShowImage("EdgeColorImage", cvColorImg);
-	cvWaitKey(0);
-	cvReleaseImage(&cvColorImg);
-#endif
-	cvReleaseMat(&cvImage);
+//#ifdef DEBUGEdgeDrawing
+//	cout<<"Edge Drawing, numofedge = "<<numOfEdges <<endl;
+//	/*Show the extracted edge cvImage in color. Each chain is in different color.*/
+//	IplImage* cvColorImg = cvCreateImage(cvSize(imageWidth,imageHeight),IPL_DEPTH_8U, 3);
+//	cvSet(cvColorImg, cvScalar(0,0,0));
+//	CvScalar s;
+//	srand((unsigned)time(0));
+//
+//	int lowest=100, highest=255;
+//	int range=(highest-lowest)+1;
+//	int r, g, b; //the color of lines
+//	for(unsigned int i=0; i<edgeChains.numOfEdges; i++){
+//		r = lowest+int(rand()%range);
+//		g = lowest+int(rand()%range);
+//		b = lowest+int(rand()%range);
+//		s.val[0] = r; s.val[1] = g;  s.val[2] = b;
+//		for(indexInCors = psId[i]; indexInCors<psId[i+1]; indexInCors++){
+//			cvSet2D(cvColorImg,pyCors[indexInCors],pxCors[indexInCors],s);
+//		}
+//	}
+//
+//	cvNamedWindow("EdgeColorImage", CV_WINDOW_AUTOSIZE);
+//	cvShowImage("EdgeColorImage", cvColorImg);
+//	cvWaitKey(0);
+//	cvReleaseImage(&cvColorImg);
+//#endif
 	return 1;
 }
 
 
-int EDLineDetector::EDline(BIAS::Image<unsigned char> &image, LineChains &lines, bool smoothed)
+int EDLineDetector::EDline(cv::Mat &image, LineChains &lines, bool smoothed)
 {
-#ifdef DEBUGEDLine
-	BIAS::TimeMeasure timer;
-	timer.Start();
-#endif
+
 	//first, call EdgeDrawing function to extract edges
 	EdgeChains edges;
 	if(!EdgeDrawing(image, edges,smoothed)){
@@ -819,11 +813,9 @@ int EDLineDetector::EDline(BIAS::Image<unsigned char> &image, LineChains &lines,
 	}
 	//	bValidate_ =false;
 #ifdef DEBUGEDLine
-	timer.Stop();
-	cout<<"Time to extract edges"<<endl;
-	timer.Print();
-	timer.Reset();
-	timer.Start();
+	cv::imshow("EdgeDrawing", image);
+	cv::waitKey();
+	
 #endif
 	//detect lines
 	unsigned int linePixelID = edges.sId[edges.numOfEdges];
@@ -838,11 +830,11 @@ int EDLineDetector::EDline(BIAS::Image<unsigned char> &image, LineChains &lines,
 	unsigned int *pLineSID   = lines.sId.data();
 	logNT_ = 2.0 * ( log10( (double) imageWidth ) + log10( (double) imageHeight ) );
 	double lineFitErr;//the line fit error;
-	BIAS::Vector<double> lineEquation(2);//[a,b] for lines y=ax+b(horizontal) or x=ay+b(vertical)
+	std::array<double, 2> lineEquation;
 	lineEquations_.clear();
 	lineEndpoints_.clear();
 	lineDirection_.clear();
-	unsigned char *pdirImg = dirImg_.GetImageData();
+	unsigned char *pdirImg = dirImg_.data;
 	unsigned int numOfLines = 0;
 	unsigned int offsetInEdgeArrayS, offsetInEdgeArrayE, newOffsetS;//start index and end index
 	unsigned int offsetInLineArray=0;
@@ -906,7 +898,7 @@ int EDLineDetector::EDline(BIAS::Image<unsigned char> &image, LineChains &lines,
 					}
 				}
 				//the line equation coefficients,for line w1x+w2y+w3 =0, we normalize it to make w1^2+w2^2 = 1.
-				BIAS::Vector3<double> lineEqu(lineEquation[0]*coef1, -1*coef1, lineEquation[1]*coef1);
+				std::array<double, 3> lineEqu = {lineEquation[0]*coef1, -1*coef1, lineEquation[1]*coef1};
 				if(LineValidation_(pLineXCors,pLineYCors,pLineSID[numOfLines],offsetInLineArray,lineEqu,direction)){//check the line
 					//store the line equation coefficients
 					lineEquations_.push_back(lineEqu);
@@ -915,7 +907,7 @@ int EDLineDetector::EDline(BIAS::Image<unsigned char> &image, LineChains &lines,
 					 *to get the line endpoints.
 					 *xp= (w2^2*x0-w1*w2*y0-w3*w1)/(w1^2+w2^2)
 					 *yp= (w1^2*y0-w1*w2*x0-w3*w2)/(w1^2+w2^2)  */
-					BIAS::Vector4<float> lineEndP;//line endpoints
+					std::array<float, 4> lineEndP;//line endpoints
 					double a1 = lineEqu[1]*lineEqu[1];
 					double a2 = lineEqu[0]*lineEqu[0];
 					double a3 = lineEqu[0]*lineEqu[1];
@@ -973,7 +965,7 @@ int EDLineDetector::EDline(BIAS::Image<unsigned char> &image, LineChains &lines,
 					}
 				}
 				//the line equation coefficients,for line w1x+w2y+w3 =0, we normalize it to make w1^2+w2^2 = 1.
-				BIAS::Vector3<double> lineEqu(1*coef1,-lineEquation[0]*coef1, -lineEquation[1]*coef1);
+				std::array<double, 3> lineEqu= {1*coef1,-lineEquation[0]*coef1, -lineEquation[1]*coef1};
 				if(LineValidation_(pLineXCors,pLineYCors,pLineSID[numOfLines],offsetInLineArray,lineEqu,direction)){//check the line
 					//store the line equation coefficients
 					lineEquations_.push_back(lineEqu);
@@ -982,7 +974,7 @@ int EDLineDetector::EDline(BIAS::Image<unsigned char> &image, LineChains &lines,
 					 *to get the line endpoints.
 					 *xp= (w2^2*x0-w1*w2*y0-w3*w1)/(w1^2+w2^2)
 					 *yp= (w1^2*y0-w1*w2*x0-w3*w2)/(w1^2+w2^2)  */
-					BIAS::Vector4<float> lineEndP;//line endpoints
+					std::array<float, 4> lineEndP;//line endpoints
 					double a1 = lineEqu[1]*lineEqu[1];
 					double a2 = lineEqu[0]*lineEqu[0];
 					double a3 = lineEqu[0]*lineEqu[1];
@@ -1009,55 +1001,52 @@ int EDLineDetector::EDline(BIAS::Image<unsigned char> &image, LineChains &lines,
 	pLineSID[numOfLines] = offsetInLineArray;
 	lines.numOfLines = numOfLines;
 #ifdef DEBUGEDLine
-	timer.Stop();
-	cout<<"Time to detect lines"<<endl;
-	timer.Print();
-	timer.Reset();
-	/*Show the extracted lines in color. Each line is in different color.*/
-	IplImage* cvColorImg = cvCreateImage(cvSize(imageWidth,imageHeight),IPL_DEPTH_8U, 3);
-	cvSet(cvColorImg, cvScalar(0,0,0));
-	CvScalar s;
-	srand((unsigned)time(0));
-	int lowest=100, highest=255;
-	int range=(highest-lowest)+1;
-	//	CvPoint point;
-	//	CvFont  font;
-	//	cvInitFont(&font,CV_FONT_HERSHEY_SIMPLEX ,1.0,1.0,0,1);
-	int r, g, b; //the color of lines
-	for(unsigned int i=0; i<lines.numOfLines; i++){
-		r = lowest+int(rand()%range);
-		g = lowest+int(rand()%range);
-		b = lowest+int(rand()%range);
-		s.val[0] = b; s.val[1] = g;  s.val[2] = r;
-		for(offsetInLineArray = pLineSID[i]; offsetInLineArray<pLineSID[i+1]; offsetInLineArray++){
-			cvSet2D(cvColorImg,pLineYCors[offsetInLineArray],pLineXCors[offsetInLineArray],s);
-		}
-		//		iter = lines[i].begin();
-		//		point = cvPoint(iter->x,iter->y);
-		//		char buf[10];
-		//		sprintf( buf,   "%d ",  i);
-		//		cvPutText(cvColorImg,buf,point,&font,CV_RGB(r,g,b));
-	}
-	cvNamedWindow("LineColorImage", CV_WINDOW_AUTOSIZE);
-	cvShowImage("LineColorImage", cvColorImg);
-	cvWaitKey(0);
-	cvReleaseImage(&cvColorImg);
+//	/*Show the extracted lines in color. Each line is in different color.*/
+//	IplImage* cvColorImg = cvCreateImage(cvSize(imageWidth,imageHeight),IPL_DEPTH_8U, 3);
+//	cvSet(cvColorImg, cvScalar(0,0,0));
+//	CvScalar s;
+//	srand((unsigned)time(0));
+//	int lowest=100, highest=255;
+//	int range=(highest-lowest)+1;
+//	//	CvPoint point;
+//	//	CvFont  font;
+//	//	cvInitFont(&font,CV_FONT_HERSHEY_SIMPLEX ,1.0,1.0,0,1);
+//	int r, g, b; //the color of lines
+//	for(unsigned int i=0; i<lines.numOfLines; i++){
+//		r = lowest+int(rand()%range);
+//		g = lowest+int(rand()%range);
+//		b = lowest+int(rand()%range);
+//		s.val[0] = b; s.val[1] = g;  s.val[2] = r;
+//		for(offsetInLineArray = pLineSID[i]; offsetInLineArray<pLineSID[i+1]; offsetInLineArray++){
+//			cvSet2D(cvColorImg,pLineYCors[offsetInLineArray],pLineXCors[offsetInLineArray],s);
+//		}
+//		//		iter = lines[i].begin();
+//		//		point = cvPoint(iter->x,iter->y);
+//		//		char buf[10];
+//		//		sprintf( buf,   "%d ",  i);
+//		//		cvPutText(cvColorImg,buf,point,&font,CV_RGB(r,g,b));
+//	}
+//	cvNamedWindow("LineColorImage", CV_WINDOW_AUTOSIZE);
+//	cvShowImage("LineColorImage", cvColorImg);
+//	cvWaitKey(0);
+//	cvReleaseImage(&cvColorImg);
 #endif
 	return 1;
 }
 
 
 double EDLineDetector::LeastSquaresLineFit_(  unsigned int *xCors,   unsigned int *yCors,
-		unsigned int offsetS,		BIAS::Vector<double> &lineEquation)
+		unsigned int offsetS,		std::array<double, 2> &lineEquation)
 {
-	if(lineEquation.Size()!=2){
-		lineEquation.newsize(2);
+	if(lineEquation.size()!=2){
+	    std::cout<<"SHOULD NOT BE != 2"<<std::endl;
+	    CV_Assert(false);
 	}
-	int * pMatT;
-	int * pATA;
+	float * pMatT;
+	float * pATA;
 	double fitError = 0;
 	double coef;
-	unsigned char *pdirImg = dirImg_.GetImageData();
+	unsigned char *pdirImg = dirImg_.data;
 	unsigned int offset = offsetS;
 	/*If the first pixel in this chain is horizontal,
 	 *then we try to find a horizontal line, y=ax+b;*/
@@ -1067,20 +1056,20 @@ double EDLineDetector::LeastSquaresLineFit_(  unsigned int *xCors,   unsigned in
 		 * [x1,1] [a]     [y1]
 		 *    .   [b]  =   .
 		 * [xn,1]         [yn]*/
-		pMatT= fitMatT.GetData();//fitMatT = [x0, x1, ... xn; 1,1,...,1];
+		pMatT= fitMatT.ptr<float>();//fitMatT = [x0, x1, ... xn; 1,1,...,1];
 		for(int i=0; i<minLineLen_; i++){
 			//*(pMatT+minLineLen_) = 1; //the value are not changed;
 			*(pMatT++)           = xCors[offsetS];
-			fitVec[i]            = yCors[offsetS++];
+			fitVec[0][i]            = yCors[offsetS++];
 		}
-		fitMatT.MultiplyWithTransposeOf(fitMatT, ATA);
-		ATV = fitMatT * fitVec;
+		ATA = fitMatT * fitMatT.t();
+		ATV = fitMatT * fitVec.t();
 		/* [a,b]^T = Inv(mat^T * mat) * mat^T * vec */
-		pATA = ATA.GetData();
+		pATA = ATA.ptr<float>();
 		coef = 1.0/(double(pATA[0])*double(pATA[3]) - double(pATA[1])*double(pATA[2]));
 		//		lineEquation = svd.Invert(ATA) * matT * vec;
-		lineEquation[0] = coef *( double(pATA[3])*double(ATV[0])-double(pATA[1])*double(ATV[1]));
-		lineEquation[1] = coef *( double(pATA[0])*double(ATV[1])-double(pATA[2])*double(ATV[0]));
+		lineEquation[0] = coef *( double(pATA[3])*double(ATV[0][0])-double(pATA[1])*double(ATV[0][1]));
+		lineEquation[1] = coef *( double(pATA[0])*double(ATV[0][1])-double(pATA[2])*double(ATV[0][0]));
 		/*compute line fit error */
 		for(int i=0; i<minLineLen_; i++){
 			coef = double(yCors[offset]) - double(xCors[offset++]) * lineEquation[0] - lineEquation[1];
@@ -1096,20 +1085,20 @@ double EDLineDetector::LeastSquaresLineFit_(  unsigned int *xCors,   unsigned in
 		 * [y1,1] [a]     [x1]
 		 *    .   [b]  =   .
 		 * [yn,1]         [xn]*/
-		pMatT = fitMatT.GetData();//fitMatT = [y0, y1, ... yn; 1,1,...,1];
+		pMatT = fitMatT.ptr<float>();//fitMatT = [y0, y1, ... yn; 1,1,...,1];
 		for(int i=0; i<minLineLen_; i++){
 			//*(pMatT+minLineLen_) = 1;//the value are not changed;
 			*(pMatT++)           = yCors[offsetS];
-			fitVec[i]            = xCors[offsetS++];
+			fitVec[0][i]          = xCors[offsetS++];
 		}
-		fitMatT.MultiplyWithTransposeOf(fitMatT, ATA);
-		ATV = fitMatT * fitVec;
+		ATA = fitMatT*(fitMatT.t());
+		ATV = fitMatT * fitVec.t();
 		/* [a,b]^T = Inv(mat^T * mat) * mat^T * vec */
-		pATA = ATA.GetData();
+		pATA = ATA.ptr<float>();
 		coef = 1.0/(double(pATA[0])*double(pATA[3]) - double(pATA[1])*double(pATA[2]));
 		//		lineEquation = svd.Invert(ATA) * matT * vec;
-		lineEquation[0] = coef *( double(pATA[3])*double(ATV[0])-double(pATA[1])*double(ATV[1]));
-		lineEquation[1] = coef *( double(pATA[0])*double(ATV[1])-double(pATA[2])*double(ATV[0]));
+		lineEquation[0] = coef *( double(pATA[3])*double(ATV[0][0])-double(pATA[1])*double(ATV[0][1]));
+		lineEquation[1] = coef *( double(pATA[0])*double(ATV[0][1])-double(pATA[2])*double(ATV[0][0]));
 		/*compute line fit error */
 		for(int i=0; i<minLineLen_; i++){
 			coef = double(xCors[offset]) - double(yCors[offset++]) * lineEquation[0] - lineEquation[1];
@@ -1121,7 +1110,7 @@ double EDLineDetector::LeastSquaresLineFit_(  unsigned int *xCors,   unsigned in
 }
 double EDLineDetector::LeastSquaresLineFit_(  unsigned int *xCors,   unsigned int *yCors,
 		unsigned int offsetS, unsigned int newOffsetS,
-		unsigned int offsetE,	BIAS::Vector<double> &lineEquation)
+		unsigned int offsetE,	std::array<double, 2> &lineEquation)
 {
 	int length = offsetE - offsetS;
 	int newLength = offsetE - newOffsetS;
@@ -1131,16 +1120,17 @@ double EDLineDetector::LeastSquaresLineFit_(  unsigned int *xCors,   unsigned in
 		<<offsetE<<", offsetS="<<offsetS<<", newOffsetS="<<newOffsetS<<endl;
 		return -1;
 	}
-	if(lineEquation.Size()!=2){
-		lineEquation.newsize(2);
+	if(lineEquation.size()!=2){
+	    std::cout<<"SHOULD NOT BE != 2"<<std::endl;
+	    CV_Assert(false);
 	}
-	BIAS::Matrix<int>  matT(2,newLength);
-	BIAS::Vector<int>  vec(newLength);
-	int * pMatT;
-	int * pATA;
+	cv::Mat_<float>  matT(2,newLength);
+	cv::Mat_<float>  vec(newLength,1);
+	float * pMatT;
+	float * pATA;
 	//	double fitError = 0;
 	double coef;
-	unsigned char *pdirImg = dirImg_.GetImageData();
+	unsigned char *pdirImg = dirImg_.data;
 	/*If the first pixel in this chain is horizontal,
 	 *then we try to find a horizontal line, y=ax+b;*/
 	if(pdirImg[yCors[offsetS]*imageWidth + xCors[offsetS] ]==Horizontal){
@@ -1149,21 +1139,21 @@ double EDLineDetector::LeastSquaresLineFit_(  unsigned int *xCors,   unsigned in
 		 * [x1',1] [a]     [y1']
 		 *    .    [b]  =   .
 		 * [xn',1]         [yn']*/
-		pMatT = matT.GetData();//matT = [x0', x1', ... xn'; 1,1,...,1]
+		pMatT = matT.ptr<float>();//matT = [x0', x1', ... xn'; 1,1,...,1]
 		for(int i=0; i<newLength; i++){
 			*(pMatT+newLength) = 1;
 			*(pMatT++)         = xCors[newOffsetS];
-			vec[i]             = yCors[newOffsetS++];
+			vec[0][i]          = yCors[newOffsetS++];
 		}
 		/* [a,b]^T = Inv(ATA + mat^T * mat) * (ATV + mat^T * vec) */
-		matT.MultiplyWithTransposeOf(matT, tempMatLineFit);
+		tempMatLineFit = matT* matT.t();
 		tempVecLineFit = matT * vec;
 		ATA = ATA + tempMatLineFit;
 		ATV = ATV + tempVecLineFit;
-		pATA = ATA.GetData();
+		pATA = ATA.ptr<float>();
 		coef = 1.0/(double(pATA[0])*double(pATA[3]) - double(pATA[1])*double(pATA[2]));
-		lineEquation[0] = coef *( double(pATA[3])*double(ATV[0])-double(pATA[1])*double(ATV[1]));
-		lineEquation[1] = coef *( double(pATA[0])*double(ATV[1])-double(pATA[2])*double(ATV[0]));
+		lineEquation[0] = coef *( double(pATA[3])*double(ATV[0][0])-double(pATA[1])*double(ATV[0][1]));
+		lineEquation[1] = coef *( double(pATA[0])*double(ATV[0][1])-double(pATA[2])*double(ATV[0][0]));
 		/*compute line fit error */
 		//		for(int i=0; i<length; i++){
 		//			coef = double(yCors[offsetS]) - double(xCors[offsetS++]) * lineEquation[0] - lineEquation[1];
@@ -1179,21 +1169,24 @@ double EDLineDetector::LeastSquaresLineFit_(  unsigned int *xCors,   unsigned in
 		 * [y1',1] [a]     [x1']
 		 *    .    [b]  =   .
 		 * [yn',1]         [xn']*/
-		pMatT = matT.GetData();//matT = [y0', y1', ... yn'; 1,1,...,1]
+//		pMatT = matT.GetData();//matT = [y0', y1', ... yn'; 1,1,...,1]
+		pMatT = matT.ptr<float>();//matT = [y0', y1', ... yn'; 1,1,...,1]
 		for(int i=0; i<newLength; i++){
 			*(pMatT+newLength) = 1;
 			*(pMatT++)         = yCors[newOffsetS];
-			vec[i]             = xCors[newOffsetS++];
+			vec[0][i]             = xCors[newOffsetS++];
 		}
 		/* [a,b]^T = Inv(ATA + mat^T * mat) * (ATV + mat^T * vec) */
-		matT.MultiplyWithTransposeOf(matT, tempMatLineFit);
+//		matT.MultiplyWithTransposeOf(matT, tempMatLineFit);
+		tempMatLineFit = matT*matT.t();
 		tempVecLineFit = matT * vec;
 		ATA = ATA + tempMatLineFit;
 		ATV = ATV + tempVecLineFit;
-		pATA = ATA.GetData();
+//		pATA = ATA.GetData();
+		pATA = ATA.ptr<float>();
 		coef = 1.0/(double(pATA[0])*double(pATA[3]) - double(pATA[1])*double(pATA[2]));
-		lineEquation[0] = coef *( double(pATA[3])*double(ATV[0])-double(pATA[1])*double(ATV[1]));
-		lineEquation[1] = coef *( double(pATA[0])*double(ATV[1])-double(pATA[2])*double(ATV[0]));
+		lineEquation[0] = coef *( double(pATA[3])*double(ATV[0][0])-double(pATA[1])*double(ATV[0][1]));
+		lineEquation[1] = coef *( double(pATA[0])*double(ATV[0][1])-double(pATA[2])*double(ATV[0][0]));
 		/*compute line fit error */
 		//		for(int i=0; i<length; i++){
 		//			coef = double(xCors[offsetS]) - double(yCors[offsetS++]) * lineEquation[0] - lineEquation[1];
@@ -1205,18 +1198,17 @@ double EDLineDetector::LeastSquaresLineFit_(  unsigned int *xCors,   unsigned in
 
 bool EDLineDetector::LineValidation_(  unsigned int *xCors,   unsigned int *yCors,
 		unsigned int offsetS, unsigned int offsetE,
-		BIAS::Vector3<double> &lineEquation, float &direction)
+		std::array<double, 3> &lineEquation, float &direction)
 {
 	if(bValidate_){
 		int n = offsetE - offsetS;
 		/*first compute the direction of line, make sure that the dark side always be the
 		 *left side of a line.*/
 		int meanGradientX=0, meanGradientY=0;
-		short *pdxImg = dxImg_->data.s;
-		short *pdyImg = dyImg_->data.s;
+		short *pdxImg = dxImg_.ptr<short>();
+		short *pdyImg = dyImg_.ptr<short>();
 		double dx, dy;
-		BIAS::Vector<double> pointDirection(n);
-		double *pPointDirection = pointDirection.GetData();
+		std::vector<double> pointDirection;
 		int index;
 		for(int i=0; i<n; i++){
 			index = yCors[offsetS]*imageWidth + xCors[offsetS++];
@@ -1224,7 +1216,7 @@ bool EDLineDetector::LineValidation_(  unsigned int *xCors,   unsigned int *yCor
 			meanGradientY += pdyImg[index];
 			dx = (double) pdxImg[index];
 			dy = (double) pdyImg[index];
-			*(pPointDirection++) = atan2(-dx,dy);
+			pointDirection.push_back(atan2(-dx,dy));
 		}
 		dx = fabs(lineEquation[1]);
 		dy = fabs(lineEquation[0]);
@@ -1272,14 +1264,14 @@ bool EDLineDetector::LineValidation_(  unsigned int *xCors,   unsigned int *yCor
 	}
 }
 
-int EDLineDetector::EDline(BIAS::Image<unsigned char> &image, bool smoothed)
+int EDLineDetector::EDline(cv::Mat &image, bool smoothed)
 {
 	if(!EDline(image, lines_, smoothed)){
 		return -1;
 	}
 	lineSalience_.clear();
 	lineSalience_.resize(lines_.numOfLines);
-	unsigned char *pgImg  = gImgWO_->data.ptr;
+	unsigned char *pgImg  = gImgWO_.data;
 	unsigned int indexInLineArray;
 	unsigned int *pXCor = lines_.xCors.data();
 	unsigned int *pYCor = lines_.yCors.data();

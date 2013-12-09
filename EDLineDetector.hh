@@ -1,24 +1,54 @@
-/*
- * EDLineDetector.hh
- *
- *  Created on: Nov 30, 2011
- *      Author: lz
- */
+/*IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
+
+ By downloading, copying, installing or using the software you agree to this license.
+ If you do not agree to this license, do not download, install,
+ copy or use the software.
+
+
+                          License Agreement
+               For Open Source Computer Vision Library
+
+Copyright (C) 2011-2012, Lilian Zhang, all rights reserved.
+Copyright (C) 2013, Manuele Tamburrano, Stefano Fabri, all rights reserved.
+Third party copyrights are property of their respective owners.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+  * Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+
+  * The name of the copyright holders may not be used to endorse or promote products
+    derived from this software without specific prior written permission.
+
+This software is provided by the copyright holders and contributors "as is" and
+any express or implied warranties, including, but not limited to, the implied
+warranties of merchantability and fitness for a particular purpose are disclaimed.
+In no event shall the Intel Corporation or contributors be liable for any direct,
+indirect, incidental, special, exemplary, or consequential damages
+(including, but not limited to, procurement of substitute goods or services;
+loss of use, data, or profits; or business interruption) however caused
+and on any theory of liability, whether in contract, strict liability,
+or tort (including negligence or otherwise) arising in any way out of
+the use of this software, even if advised of the possibility of such damage.
+*/
 
 #ifndef EDLINEDETECTOR_HH_
 #define EDLINEDETECTOR_HH_
 
-
-#include <Base/Image/Image.hh>
-#include <Base/Image/ImageConvert.hh>
-#include <Base/Image/ImageIO.hh>
-#include <MathAlgo/SVD.hh>
-#include <Base/Math/Vector2.hh>
-#include <Base/Math/Vector3.hh>
-#include <Base/Math/Vector4.hh>
 #include <vector>
+#include <iostream>
 #include <list>
-#include <cv.h>
+#include <opencv2/core/core.hpp>
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <array>
+
 
 struct Pixel{
 	unsigned int x;//X coordinate
@@ -75,25 +105,25 @@ public:
 	 *smoothed: In, flag to mark whether the image has already been smoothed by Gaussian filter.
 	 *return -1: error happen
 	 */
-	int EdgeDrawing(BIAS::Image<unsigned char> &image, EdgeChains &edgeChains, bool smoothed=false);
+	int EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smoothed=false);
 	/*extract lines from image
 	 *image:    In, gray image;
 	 *lines:    Out, store the extracted lines,
 	 *smoothed: In, flag to mark whether the image has already been smoothed by Gaussian filter.
 	 *return -1: error happen
 	 */
-	int EDline(BIAS::Image<unsigned char> &image, LineChains &lines, bool smoothed=false);
+	int EDline(cv::Mat &image, LineChains &lines, bool smoothed=false);
 	/*extract line from image, and store them*/
-	int EDline(BIAS::Image<unsigned char> &image, bool smoothed=false);
+	int EDline(cv::Mat &image, bool smoothed=false);
 
-	CvMat *dxImg_;//store the dxImg;
-	CvMat *dyImg_;//store the dyImg;
-	CvMat *gImgWO_;//store the gradient image without threshold;
+	cv::Mat dxImg_;//store the dxImg;
+	cv::Mat dyImg_;//store the dyImg;
+	cv::Mat gImgWO_;//store the gradient image without threshold;
 	LineChains lines_; //store the detected line chains;
 	//store the line Equation coefficients, vec3=[w1,w2,w3] for line w1*x + w2*y + w3=0;
-	std::vector<BIAS::Vector3<double> > lineEquations_;
+	std::vector<std::array<double, 3> > lineEquations_;
 	//store the line endpoints, [x1,y1,x2,y3]
-	std::vector<BIAS::Vector4<float> > lineEndpoints_;
+	std::vector<std::array<float, 4> > lineEndpoints_;
 	//store the line direction
 	std::vector<float>  lineDirection_;
 	//store the line salience, which is the summation of gradients of pixels on line
@@ -111,7 +141,7 @@ private:
 	 *return:  line fit error; -1:error happens;
 	 */
 	double LeastSquaresLineFit_(unsigned int *xCors, unsigned int *yCors,
-			unsigned int offsetS,	BIAS::Vector<double> &lineEquation);
+			unsigned int offsetS,	std::array<double, 2> &lineEquation);
 	/*For an input pixel chain, find the best fit line. Only do the update based on new points.
 	 *For A*x=v,  Least square estimation of x = Inv(A^T * A) * (A^T * v);
 	 *If some new observations are added, i.e, [A; A'] * x = [v; v'],
@@ -126,14 +156,14 @@ private:
 	 */
 	double LeastSquaresLineFit_(unsigned int *xCors, unsigned int *yCors,
 			unsigned int offsetS, unsigned int newOffsetS,
-			unsigned int offsetE,	BIAS::Vector<double> &lineEquation);
+			unsigned int offsetE,	std::array<double, 2> &lineEquation);
 	/* Validate line based on the Helmholtz principle, which basically states that
 	 * for a structure to be perceptually meaningful, the expectation of this structure
 	 * by chance must be very low.
 	 */
 	bool LineValidation_(unsigned int *xCors, unsigned int *yCors,
 			unsigned int offsetS, unsigned int offsetE,
-			BIAS::Vector3<double> &lineEquation, float &direction);
+			std::array<double, 3> &lineEquation, float &direction);
   bool bValidate_;//flag to decide whether line will be validated
 	int ksize_; //the size of Gaussian kernel: ksize X ksize, default value is 5.
 	float sigma_;//the sigma of Gaussian kernal, default value is 1.0.
@@ -169,22 +199,24 @@ private:
 	unsigned int *pSecondPartEdgeS_;//store the start index of every edge chain in the second part arrays
 	unsigned int *pAnchorX_;//store the X coordinates of anchors
 	unsigned int *pAnchorY_;//store the Y coordinates of anchors
-	BIAS::Image<unsigned char> edgeImage_;
+	cv::Mat edgeImage_;
 	/*The threshold of line fit error;
 	 *If lineFitErr is large than this threshold, then
 	 *the pixel chain is not accepted as a single line segment.*/
 	double lineFitErrThreshold_;
 
 
-	BIAS::Image<unsigned char> gImg_;//store the gradient image;
-	BIAS::Image<unsigned char> dirImg_;//store the direction image
+	cv::Mat gImg_;//store the gradient image;
+	cv::Mat dirImg_;//store the direction image
 	double logNT_;
-	BIAS::Matrix<int> ATA;	 //the previous matrix of A^T * A;
-	BIAS::Vector<int> ATV;    //the previous vector of A^T * V;
-	BIAS::Matrix<int> fitMatT;	 //the matrix used in line fit function;
-	BIAS::Vector<int> fitVec;    //the vector used in line fit function;
-	BIAS::Matrix<int> tempMatLineFit;	 //the matrix used in line fit function;
-	BIAS::Vector<int> tempVecLineFit;    //the vector used in line fit function;
+	cv::Mat_<float> ATA;	 //the previous matrix of A^T * A;
+	cv::Mat_<float> ATV;    //the previous vector of A^T * V;
+	cv::Mat_<float> fitMatT;	 //the matrix used in line fit function;
+	cv::Mat_<float> fitVec;    //the vector used in line fit function;
+	cv::Mat_<float> tempMatLineFit;	 //the matrix used in line fit function;
+	cv::Mat_<float> tempVecLineFit;    //the vector used in line fit function;
+	
+	
 	/** Compare doubles by relative error.
 	     The resulting rounding error after floating point computations
 	     depend on the specific operations done. The same number computed by
@@ -379,15 +411,5 @@ private:
 		return -log10(bin_tail) - logNT;
 	}
 };
-
-
-
-
-
-
-
-
-
-
 
 #endif /* EDLINEDETECTOR_HH_ */
