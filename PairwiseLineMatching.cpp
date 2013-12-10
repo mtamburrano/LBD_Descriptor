@@ -6,11 +6,10 @@
  */
 
 #include "PairwiseLineMatching.hh"
-#include <arlsmat.h>
-#include <arlssym.h>
+#include <eigen3/Eigen/Core>
 
-using namespace BIAS;
 using namespace std;
+using namespace cv;
 
 #define Inf       1e10 //Infinity
 //the resolution scale of theta histogram, used when compute angle histogram of lines in the image
@@ -38,8 +37,12 @@ using namespace std;
 
 //this is used when get matching result from principal eigen vector
 #define WeightOfMeanEigenVec               0.1
-
-
+template<typename T>
+void matToZero(Mat_<T> & m) {
+	for(int i = 0; i < m.rows; i++)
+		for(int j = 0; j < m.cols; j++)
+			m(i,j) = 1./(i+j+1);
+}
 void PairwiseLineMatching::LineMatching(ScaleLines &linesInLeft,ScaleLines &linesInRight,
 		std::vector<unsigned int> &matchResult)
 {
@@ -63,14 +66,14 @@ double PairwiseLineMatching::GlobalRotationOfImagePair_(ScaleLines &linesInLeft,
   double scalar = 180/(ResolutionScale*3.1415927);//used when compute the index
   double angleShift = (ResolutionScale*M_PI)/360;//make sure zero is the middle of the interval
 
-	Vector<double> angleHistLeft(dim);
-	Vector<double> angleHistRight(dim);
-	Vector<double> lengthLeft(dim);//lengthLeft[i] store the total line length of all the lines in the ith angle bin.
-	Vector<double> lengthRight(dim);
-  angleHistLeft.SetZero();
-  angleHistRight.SetZero();
-  lengthLeft.SetZero();
-  lengthRight.SetZero();
+	Eigen::VectorXd angleHistLeft(dim);
+	Eigen::VectorXd angleHistRight(dim);
+	Eigen::VectorXd lengthLeft(dim);//lengthLeft[i] store the total line length of all the lines in the ith angle bin.
+	Eigen::VectorXd lengthRight(dim);
+  angleHistLeft.setZero();
+  angleHistRight.setZero();
+  lengthLeft.setZero();
+  lengthRight.setZero();
 
   for(unsigned int linenum=0; linenum<linesInLeft.size(); linenum++){
   	direction = linesInLeft[linenum][0].direction+M_PI+angleShift;
@@ -87,22 +90,22 @@ double PairwiseLineMatching::GlobalRotationOfImagePair_(ScaleLines &linesInLeft,
   	lengthRight[index] += linesInRight[linenum][0].lineLength;
   }
 
-  angleHistLeft  = (1/angleHistLeft.NormL2())*angleHistLeft;
-  angleHistRight = (1/angleHistRight.NormL2())*angleHistRight;
-  lengthLeft     = (1/lengthLeft.NormL2())*lengthLeft;
-  lengthRight    = (1/lengthRight.NormL2())*lengthRight;
+  angleHistLeft.normalize();//  = (1/angleHistLeft.NormL2())*angleHistLeft;
+  angleHistRight.normalize();// = (1/angleHistRight.NormL2())*angleHistRight;
+  lengthLeft.normalize(); //    = (1/lengthLeft.NormL2())*lengthLeft;
+  lengthRight.normalize();//    = (1/lengthRight.NormL2())*lengthRight;
 
 //  angleHistLeft.Save("histLeft.txt");
 //  angleHistRight.Save("histRight.txt");
 
   //step 2: find shift to decide the approximate global rotation
-  Vector<double> difVec(dim);//the difference vector between left histogram and shifted right histogram
+  Eigen::VectorXd difVec(dim);//the difference vector between left histogram and shifted right histogram
   double minDif=10;//the minimal angle histogram difference
   double secondMinDif = 10;//the second minimal histogram difference
   unsigned int minShift;//the shift of right angle histogram when minimal difference achieved
   unsigned int secondMinShift;//the shift of right angle histogram when second minimal difference achieved
 
-  Vector<double> lengthDifVec(dim);//the length difference vector between left and right
+  Eigen::VectorXd lengthDifVec(dim);//the length difference vector between left and right
   double minLenDif = 10;//the minimal length difference
   double secondMinLenDif = 10;//the second minimal length difference
   unsigned int minLenShift;//the shift of right length vector when minimal length difference achieved
@@ -117,7 +120,7 @@ double PairwiseLineMatching::GlobalRotationOfImagePair_(ScaleLines &linesInLeft,
   		lengthDifVec[j] = lengthLeft[j] - lengthRight[index];
   	}
     //find the minShift and secondMinShift for angle histogram
-    normOfVec = difVec.NormL2();
+    normOfVec = difVec.norm();
     if(normOfVec<secondMinDif){
     	if(normOfVec<minDif){
     		secondMinDif   = minDif;
@@ -130,7 +133,7 @@ double PairwiseLineMatching::GlobalRotationOfImagePair_(ScaleLines &linesInLeft,
     	}
     }
     //find the minLenShift and secondMinLenShift of length vector
-    normOfVec = lengthDifVec.NormL2();
+    normOfVec = lengthDifVec.norm();
     if(normOfVec<secondMinLenDif){
     	if(normOfVec<minLenDif){
     		secondMinLenDif    = minLenDif;
@@ -172,7 +175,7 @@ void PairwiseLineMatching::BuildAdjacencyMatrix_(ScaleLines &linesInLeft,ScaleLi
 	double lengthDif;
 
 	unsigned int dimOfDes = linesInLeft[0][0].descriptor.size();
-	Matrix<double> desDisMat(numLineLeft,numLineRight);//store the descriptor distance of lines in left and right images.
+	Mat_<double> desDisMat(numLineLeft,numLineRight);//store the descriptor distance of lines in left and right images.
 	std::vector<float> desLeft;
 	std::vector<float> desRight;
 
@@ -274,21 +277,21 @@ void PairwiseLineMatching::BuildAdjacencyMatrix_(ScaleLines &linesInLeft,ScaleLi
 	 */
 	//	Matrix<double> testMat(dim,dim);
 	//	testMat.SetZero();
-	Vector<double> adjacenceVec(dim*(dim+1)/2);
-	adjacenceVec.SetZero();
+	Eigen::VectorXd adjacenceVec(dim*(dim+1)/2);
+	adjacenceVec.setZero();
 	/*In order to save computational time, the following variables are used to store
 	 *the pairwise geometric information which has been computed and will be reused many times
 	 *latter. The reduction of computational time is at the expenses of memory consumption.
 	 */
-	Matrix<unsigned int> bComputedLeft(numLineLeft,numLineLeft);//flag to show whether the ith pair of left image has already been computed.
-	bComputedLeft.SetZero();
-	Matrix<double> intersecRatioLeft(numLineLeft,numLineLeft);//the ratio of intersection point and the line in the left pair
-	Matrix<double> projRatioLeft(numLineLeft,numLineLeft);//the point to line distance divided by the projected length of line in the left pair.
+	Mat_<unsigned int> bComputedLeft(numLineLeft,numLineLeft);//flag to show whether the ith pair of left image has already been computed.
+	matToZero(bComputedLeft);
+	Mat_<double> intersecRatioLeft(numLineLeft,numLineLeft);//the ratio of intersection point and the line in the left pair
+	Mat_<double> projRatioLeft(numLineLeft,numLineLeft);//the point to line distance divided by the projected length of line in the left pair.
 
-	Matrix<unsigned int> bComputedRight(numLineRight,numLineRight);//flag to show whether the ith pair of right image has already been computed.
-	bComputedRight.SetZero();
-	Matrix<double>       intersecRatioRight(numLineRight,numLineRight);//the ratio of intersection point and the line in the right pair
-	Matrix<double>       projRatioRight(numLineRight,numLineRight);//the point to line distance divided by the projected length of line in the right pair.
+	Mat_<unsigned int> bComputedRight(numLineRight,numLineRight);//flag to show whether the ith pair of right image has already been computed.
+	matToZero(bComputedRight);
+	Mat_<double>       intersecRatioRight(numLineRight,numLineRight);//the ratio of intersection point and the line in the right pair
+	Mat_<double>       projRatioRight(numLineRight,numLineRight);//the point to line distance divided by the projected length of line in the right pair.
 
 
 
@@ -566,22 +569,22 @@ void PairwiseLineMatching::MatchingResultFromPrincipalEigenvector_(ScaleLines &l
 
 
   //store eigenMap for debug
-  std::fstream resMap;
+  /*std::fstream resMap;
   ostringstream fileNameMap;
   fileNameMap<<"eigenVec.txt";
   resMap.open(fileNameMap.str().c_str(), std::ios::out);
 
-  Matrix<double> mat(linesInLeft.size(),linesInRight.size());
-  mat.SetZero();
+  Mat_<double> mat(linesInLeft.size(),linesInRight.size());
+  matToZero(mat);
   for(iter = eigenMap_.begin();iter!=eigenMap_.end(); iter++){
   	id = iter->second;
   	resMap<<nodesList_[id].leftLineID<<"    "<<nodesList_[id].rightLineID<<"   "<<iter->first<<endl;
   	mat[nodesList_[id].leftLineID][nodesList_[id].rightLineID] = iter->first;
   }
-  mat.Save("eigenMap.txt");
+  //mat.Save("eigenMap.txt");
   resMap.flush();
   resMap.close();
-
+ */
 
 	/*first try, start from the top element in eigenmap */
 	while(1){

@@ -8,7 +8,6 @@
 #ifndef PAIRWISELINEMATCHING_HH_
 #define PAIRWISELINEMATCHING_HH_
 #include <map>
-#include <Base/Math/Matrix.hh>
 #include "LineDescriptor.hh"
 
 
