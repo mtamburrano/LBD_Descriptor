@@ -30,13 +30,13 @@ SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -O3") #-fno-omit-frame-pointer")
 
 # source files of library "LineMatchingLib" to be created
 SET(LineMatchingLib_SRCS
-    #PairwiseLineMatching.cpp
+    PairwiseLineMatching.cpp
     LineDescriptor.cpp
     EDLineDetector.cpp
 )
 # header files to be installed
 SET(LineMatchingLib_HEADER
-    #PairwiseLineMatching.hh
+    PairwiseLineMatching.hh
     LineDescriptor.hh
     EDLineDetector.hh
     LineStructure.hh
