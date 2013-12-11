@@ -171,7 +171,7 @@ int EDLineDetector::EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smo
 		}
 		dxImg_.create(imageHeight, imageWidth, CV_16SC1);
 		dyImg_.create(imageHeight, imageWidth, CV_16SC1 );
-		gImgWO_.create(imageHeight, imageWidth, CV_8UC1 );
+		gImgWO_.create(imageHeight, imageWidth, CV_8SC1 );
 		gImg_.create(imageHeight, imageWidth, CV_8UC1 );
 		dirImg_.create(imageHeight, imageWidth, CV_8UC1 );
 		edgeImage_.create(imageHeight, imageWidth, CV_8UC1 );
@@ -208,18 +208,37 @@ int EDLineDetector::EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smo
 	cv::Mat dxABS_m = cv::abs(dxImg_);
 	//cv::Mat dyABS_m = dyImg_.clone();
 	cv::Mat dyABS_m = cv::abs(dyImg_);
-	//cv::Mat sumDxDy(dxABS_m.size(), CV_16SC1);
-	//sumDxDy = (dxABS_m - dyABS_m);
-	cv::Mat sumDxDy;
-	cv::add(dyABS_m, dxABS_m, sumDxDy);
-	//cv:divide(4,sumDxDy,gImgWO_);
-	   writeMat(dxABS_m,"dxABS_m", 0);
-	    writeMat(dyABS_m,"dyABS_m", 0);
-	    writeMat(sumDxDy,"sumDxDy", 0);
+//	//cv::Mat sumDxDy(dxABS_m.size(), CV_16SC1);
+//	//sumDxDy = (dxABS_m - dyABS_m);
+//	cv::Mat sumDxDy;
+//	cv::add(dyABS_m, dxABS_m, sumDxDy);
+//	//cv:divide(4,sumDxDy,gImgWO_);
+//	gImgWO_ = sumDxDy/4;
+////	for(int y = 1; y < gImgWO_.rows-1; y++) 
+////	{
+////    	for(int x = 0; x < gImgWO_.cols; x++)
+////    	{
+////    	    if((int)gImgWO_.at<uchar>(x,y) > 230)
+////    	        std::cout<<(int)gImgWO_.at<uchar>(x,y)<<std::endl;
+////    	}
+////	}
+//	writeMat(gImgWO_, "gImgWO_", 0);
 
-//	cv:divide(4,dxABS_m + dyABS_m,sumDxDy);
+	
+	 for(int i=0; i<pixelNum; i++){
+	      //compute gradient image
+	      //      pgImg[i] = sqrt(pdxImg[i]*pdxImg[i]+pdyImg[i]*pdyImg[i]);
+	      dxABS = abs(*(pdxImg++));
+	      dyABS = abs(*(pdyImg++));
+	      dxAdy = dxABS + dyABS;
+	      temp = (unsigned char) ((dxAdy+4-1)/4);
+	      *(pgImgWO++) = temp;
+
+	  }
+	
+	
 	cv::threshold(gImgWO_,gImg_, gradienThreshold_, 255, cv::THRESH_TOZERO);
-	cv::compare(dxABS, dyABS, dirImg_, cv::CMP_LT);
+	cv::compare(dxABS_m, dyABS_m, dirImg_, cv::CMP_LT);
 	
 
 	
@@ -231,7 +250,7 @@ int EDLineDetector::EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smo
 //		dxABS = abs(*(pdxImg++));
 //		dyABS = abs(*(pdyImg++));
 //		dxAdy = dxABS + dyABS;
-//		temp = (unsigned char) (dxAdy/4);
+//		temp = (unsigned char) ((dxAdy+4-1)/4);
 //		*(pgImgWO++) = temp;
 //		if(dxAdy<gradienThreshold_){//detect possible edge areas
 //			*(pgImg++) = 0;
@@ -245,29 +264,30 @@ int EDLineDetector::EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smo
 //			*(pdirImg++) = Vertical;
 //		}
 //	}
-	   cv::imshow("pdrImg1",dirImg_);
-	   cv::Mat grad_x, grad_y, abs_grad_x, abs_grad_y, abs_grad, grad;
-	   cv::Sobel( gImgWO_, grad_x, -1, 1, 0, 3);
-	   cv::convertScaleAbs( grad_x, abs_grad_x );
-
-	    /// Gradient Y
-	    //Scharr( src_gray, grad_y, ddepth, 0, 1, scale, delta, BORDER_DEFAULT );
-	   cv::Sobel( gImgWO_, grad_y, -1, 0, 1, 3);
-	    convertScaleAbs( grad_y, abs_grad_y );
-
-	    /// Total Gradient (approximate)
-	    cv::addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, grad );
-
-	    cv::imshow( "window_name", grad );
-	    cv::waitKey();
+//	   writeMat(gImgWO_, "gImgWO_", 1);
+//	   cv::imshow("pdrImg1",dirImg_);
+//	   cv::Mat grad_x, grad_y, abs_grad_x, abs_grad_y, abs_grad, grad;
+//	   cv::Sobel( gImgWO_, grad_x, -1, 1, 0, 3);
+//	   cv::convertScaleAbs( grad_x, abs_grad_x );
+//
+//	    /// Gradient Y
+//	    //Scharr( src_gray, grad_y, ddepth, 0, 1, scale, delta, BORDER_DEFAULT );
+//	   cv::Sobel( gImgWO_, grad_y, -1, 0, 1, 3);
+//	    convertScaleAbs( grad_y, abs_grad_y );
+//
+//	    /// Total Gradient (approximate)
+//	    cv::addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, grad );
+//
+//	    cv::imshow( "window_name", grad );
+//	    cv::waitKey();
 	    
 	t = ((double)cv::getTickCount() - t)/cv::getTickFrequency();
 	std::cout<<"FOR ABS: "<<t<<"s"<<std::endl;
 
 	pdxImg = dxImg_.ptr<short>();
 	pdyImg = dyImg_.ptr<short>();
-	pgImg  = gImg_.data;
-	pdirImg = dirImg_.data;
+	pgImg  = gImg_.ptr();
+	pdirImg = dirImg_.ptr();
 	
 	//extract the anchors in the gradient image, store into a vector
 	memset(pAnchorX_,  0, edgePixelArraySize*sizeof(unsigned int));//initialization
