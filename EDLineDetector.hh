@@ -47,6 +47,7 @@ the use of this software, even if advised of the possibility of such damage.
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include "opencv2/core/utility.hpp"
 #include <array>
 
 

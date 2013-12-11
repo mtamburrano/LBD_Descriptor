@@ -625,12 +625,29 @@ int LineDescriptor::ComputeLBD_(ScaleLines &keyLines)
 
 int LineDescriptor::GetLineDescriptor(cv::Mat & image, ScaleLines & keyLines)
 {
+    double t = (double)cv::getTickCount();
     if(!OctaveKeyLines(image,keyLines)){
         cout<<"OctaveKeyLines failed"<<endl;
         return -1;
     }
-
-    ComputeLBD_(keyLines);
+    t = ((double)cv::getTickCount() - t)/cv::getTickFrequency();
+    std::cout<<"time line extraction: "<<t<<"s"<<std::endl;
+    
+//    t = (double)cv::getTickCount();
+//    ComputeLBD_(keyLines);
+//    t = ((double)cv::getTickCount() - t)/cv::getTickFrequency();
+//    std::cout<<"time descriptor extraction: "<<t<<"s"<<std::endl;
+//    
+    
+//    for(int j = 0; j<keyLines.size(); j++)
+//    {
+//        for(int k = 0; k<keyLines[j].size(); k++)
+//        {
+//            for(int i = 0; i<keyLines[j][k].descriptor.size(); i++)
+//                std::cout<<"keylines["<<j<<"]["<<k<<"].descriptor["<<i<<"]: "<<keyLines[j][k].descriptor[i]<<std::endl;
+//        }
+//    }
+    
     return 1;
 }
 
