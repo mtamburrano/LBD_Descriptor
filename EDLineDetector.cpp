@@ -171,8 +171,8 @@ int EDLineDetector::EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smo
 		}
 		dxImg_.create(imageHeight, imageWidth, CV_16SC1);
 		dyImg_.create(imageHeight, imageWidth, CV_16SC1 );
-		gImgWO_.create(imageHeight, imageWidth, CV_8SC1 );
-		gImg_.create(imageHeight, imageWidth, CV_8UC1 );
+		gImgWO_.create(imageHeight, imageWidth, CV_16SC1 );
+		gImg_.create(imageHeight, imageWidth, CV_16SC1 );
 		dirImg_.create(imageHeight, imageWidth, CV_8UC1 );
 		edgeImage_.create(imageHeight, imageWidth, CV_8UC1 );
 		pFirstPartEdgeX_ = new unsigned int[edgePixelArraySize];
@@ -195,99 +195,26 @@ int EDLineDetector::EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smo
     #endif
 	
 	//compute gradient and direction images
-	short *pdxImg = dxImg_.ptr<short>();
-	short *pdyImg = dyImg_.ptr<short>();
-	unsigned char *pgImgWO = gImgWO_.ptr();
-	unsigned char *pgImg  = gImg_.ptr();
-	unsigned char *pdirImg = dirImg_.ptr();
-	short dxABS, dyABS, dxAdy;
-	unsigned char temp;
+
 	double t = (double)cv::getTickCount();
-	
-	//cv::Mat dxABS_m = dxImg_.clone();
 	cv::Mat dxABS_m = cv::abs(dxImg_);
-	//cv::Mat dyABS_m = dyImg_.clone();
 	cv::Mat dyABS_m = cv::abs(dyImg_);
-//	//cv::Mat sumDxDy(dxABS_m.size(), CV_16SC1);
-//	//sumDxDy = (dxABS_m - dyABS_m);
-//	cv::Mat sumDxDy;
-//	cv::add(dyABS_m, dxABS_m, sumDxDy);
-//	//cv:divide(4,sumDxDy,gImgWO_);
-//	gImgWO_ = sumDxDy/4;
-////	for(int y = 1; y < gImgWO_.rows-1; y++) 
-////	{
-////    	for(int x = 0; x < gImgWO_.cols; x++)
-////    	{
-////    	    if((int)gImgWO_.at<uchar>(x,y) > 230)
-////    	        std::cout<<(int)gImgWO_.at<uchar>(x,y)<<std::endl;
-////    	}
-////	}
-//	writeMat(gImgWO_, "gImgWO_", 0);
+	cv::Mat sumDxDy;
+	cv::add(dyABS_m, dxABS_m, sumDxDy);
 
 	
-	 for(int i=0; i<pixelNum; i++){
-	      //compute gradient image
-	      //      pgImg[i] = sqrt(pdxImg[i]*pdxImg[i]+pdyImg[i]*pdyImg[i]);
-	      dxABS = abs(*(pdxImg++));
-	      dyABS = abs(*(pdyImg++));
-	      dxAdy = dxABS + dyABS;
-	      temp = (unsigned char) ((dxAdy+4-1)/4);
-	      *(pgImgWO++) = temp;
-
-	  }
-	
-	
-	cv::threshold(gImgWO_,gImg_, gradienThreshold_, 255, cv::THRESH_TOZERO);
+	cv::threshold(sumDxDy,gImg_, gradienThreshold_+1, 255, cv::THRESH_TOZERO);
+	gImg_ = gImg_/4;
+	gImgWO_ = sumDxDy/4;
 	cv::compare(dxABS_m, dyABS_m, dirImg_, cv::CMP_LT);
-	
 
-	
-	
-	
-//	for(int i=0; i<pixelNum; i++){
-//		//compute gradient image
-//		//		pgImg[i] = sqrt(pdxImg[i]*pdxImg[i]+pdyImg[i]*pdyImg[i]);
-//		dxABS = abs(*(pdxImg++));
-//		dyABS = abs(*(pdyImg++));
-//		dxAdy = dxABS + dyABS;
-//		temp = (unsigned char) ((dxAdy+4-1)/4);
-//		*(pgImgWO++) = temp;
-//		if(dxAdy<gradienThreshold_){//detect possible edge areas
-//			*(pgImg++) = 0;
-//		}else{
-//			*(pgImg++) = temp;//G = (|dx|+|dy|)/4; Scale the value to [0,255].
-//		}
-//		//compute direction image
-//		if(dxABS<dyABS){
-//			*(pdirImg++) = Horizontal;
-//		}else{
-//			*(pdirImg++) = Vertical;
-//		}
-//	}
-//	   writeMat(gImgWO_, "gImgWO_", 1);
-//	   cv::imshow("pdrImg1",dirImg_);
-//	   cv::Mat grad_x, grad_y, abs_grad_x, abs_grad_y, abs_grad, grad;
-//	   cv::Sobel( gImgWO_, grad_x, -1, 1, 0, 3);
-//	   cv::convertScaleAbs( grad_x, abs_grad_x );
-//
-//	    /// Gradient Y
-//	    //Scharr( src_gray, grad_y, ddepth, 0, 1, scale, delta, BORDER_DEFAULT );
-//	   cv::Sobel( gImgWO_, grad_y, -1, 0, 1, 3);
-//	    convertScaleAbs( grad_y, abs_grad_y );
-//
-//	    /// Total Gradient (approximate)
-//	    cv::addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, grad );
-//
-//	    cv::imshow( "window_name", grad );
-//	    cv::waitKey();
-	    
 	t = ((double)cv::getTickCount() - t)/cv::getTickFrequency();
 	std::cout<<"FOR ABS: "<<t<<"s"<<std::endl;
-
-	pdxImg = dxImg_.ptr<short>();
-	pdyImg = dyImg_.ptr<short>();
-	pgImg  = gImg_.ptr();
-	pdirImg = dirImg_.ptr();
+	
+	short *pdxImg = dxImg_.ptr<short>();
+	short *pdyImg = dyImg_.ptr<short>();
+	short *pgImg  = gImg_.ptr<short>();
+	unsigned char *pdirImg = dirImg_.ptr();
 	
 	//extract the anchors in the gradient image, store into a vector
 	memset(pAnchorX_,  0, edgePixelArraySize*sizeof(unsigned int));//initialization
@@ -298,18 +225,18 @@ int EDLineDetector::EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smo
 	for(unsigned int w=1; w<imageWidth-1; w=w+scanIntervals_){
 		for(unsigned int h=1; h<imageHeight-1; h=h+scanIntervals_){
 			indexInArray = h*imageWidth+w;
-			gValue1 = pdirImg[indexInArray];
-			if(gValue1==Horizontal){//if the direction of pixel is horizontal, then compare with up and down
-				gValue2 = pgImg[indexInArray];
-				if(gValue2>=pgImg[indexInArray-imageWidth]+anchorThreshold_
-						&&gValue2>=pgImg[indexInArray+imageWidth]+anchorThreshold_){// (w,h) is accepted as an anchor
+			//gValue1 = pdirImg[indexInArray];
+			if(pdirImg[indexInArray]==Horizontal){//if the direction of pixel is horizontal, then compare with up and down
+				//gValue2 = pgImg[indexInArray];
+				if(pgImg[indexInArray]>=pgImg[indexInArray-imageWidth]+anchorThreshold_
+						&&pgImg[indexInArray]>=pgImg[indexInArray+imageWidth]+anchorThreshold_){// (w,h) is accepted as an anchor
 							pAnchorX_[anchorsSize]   = w;
 							pAnchorY_[anchorsSize++] = h;
 				}
-			}else if(gValue1==Vertical){//it is vertical edge, should be compared with left and right
-				gValue2 = pgImg[indexInArray];
-				if(gValue2>=pgImg[indexInArray-1]+anchorThreshold_
-						&&gValue2>=pgImg[indexInArray+1]+anchorThreshold_){// (w,h) is accepted as an anchor
+			}else{// if(pdirImg[indexInArray]==Vertical){//it is vertical edge, should be compared with left and right
+				//gValue2 = pgImg[indexInArray];
+				if(pgImg[indexInArray]>=pgImg[indexInArray-1]+anchorThreshold_
+						&&pgImg[indexInArray]>=pgImg[indexInArray+1]+anchorThreshold_){// (w,h) is accepted as an anchor
 							pAnchorX_[anchorsSize]   = w;
 							pAnchorY_[anchorsSize++] = h;
 				}
@@ -1345,7 +1272,7 @@ int EDLineDetector::EDline(cv::Mat &image, bool smoothed)
 	}
 	lineSalience_.clear();
 	lineSalience_.resize(lines_.numOfLines);
-	unsigned char *pgImg  = gImgWO_.data;
+	unsigned char *pgImg  = gImgWO_.ptr();
 	unsigned int indexInLineArray;
 	unsigned int *pXCor = lines_.xCors.data();
 	unsigned int *pYCor = lines_.yCors.data();

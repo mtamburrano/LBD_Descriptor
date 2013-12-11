@@ -161,10 +161,7 @@ int LineDescriptor::OctaveKeyLines(cv::Mat & image, ScaleLines &keyLines)
 
 		////////////////////////////////////
 		//down sample the current octave image to get the next octave image
-		cv::imshow("prima sample",blur);
 		image.create((int)(blur.rows/factor), (int)(blur.cols/factor), CV_8UC1);
-		cv::imshow("dopo sample",image);
-		cv::waitKey();
 		
 		sampleUchar(blur.data,image.data, factor, blur.cols,  blur.rows);
 		preSigma2 = curSigma2;
