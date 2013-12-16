@@ -41,6 +41,35 @@ the use of this software, even if advised of the possibility of such damage.
 
 #define SalienceScale 0.9//0.9
 
+//test pairs (0,7),(0,8),(1,7),(1,8) are excluded to get a descriptor size of 256 bit
+static const int combinations [32][2] = {{0,1},{0,2},{0,3},{0,4},{0,5},{0,6},/*{0,7},{0,8},*/{1,2},{1,3},{1,4},{1,5},{1,6},/*{1,7},{1,8},*/{2,3},{2,4},{2,5},{2,6},{2,7},{2,8},{3,4},{3,5},{3,6},{3,7},{3,8},{4,5},{4,6},{4,7},{4,8},{5,6},{5,7},{5,8},{6,7},{6,8},{7,8}};
+
+static inline int get2Pow(int i) {
+    switch (i) {
+    case 0:
+        return 1;
+    case 1:
+        return 2;
+    case 2:
+        return 4;
+    case 3:
+        return 8;
+    case 4:
+        return 16;
+    case 5:
+        return 32;
+    case 6:
+        return 64;
+    case 7:
+        return 128;
+    default:
+        std::cout<<"Invalid pow"<<std::endl;
+        CV_Assert(false);
+        return -1; //avoid warning
+    }
+}
+
+
 //#define DEBUGLinesInOctaveImages
 
 using namespace std;
@@ -50,7 +79,7 @@ LineDescriptor::LineDescriptor()
 	srand ( time(NULL) );
 //	cout<<"Call LineDescriptor constructor function"<<endl;
 	ksize_       = 5;
-	numOfOctave_ = 5;//5
+	numOfOctave_ = 1;//5
 	edLineVec_.resize(numOfOctave_);
 	for(unsigned int i=0; i<numOfOctave_; i++){
 		edLineVec_[i] = new EDLineDetector;
@@ -142,17 +171,9 @@ int LineDescriptor::OctaveKeyLines(cv::Mat & image, ScaleLines &keyLines)
 		 * curSigma = [sqrt(2)]^octaveCount;
 		 * increaseSigma^2 = curSigma^2 - preSigma^2 */
 		float increaseSigma = sqrt(curSigma2-preSigma2);
-		switch(ksize_){
-            case 3: cv::GaussianBlur(image, blur, cv::Size(3,3), increaseSigma); break;
-            case 5: cv::GaussianBlur(image, blur, cv::Size(5,5), increaseSigma); break;
-            case 7: cv::GaussianBlur(image, blur, cv::Size(7,7), increaseSigma); break;
-            case 9: cv::GaussianBlur(image, blur, cv::Size(9,9), increaseSigma); break;
-            case 11: cv::GaussianBlur(image, blur, cv::Size(11,11), increaseSigma); break;
-            default: cv::GaussianBlur(image, blur, cv::Size(5,5), increaseSigma); break;
 
-		}
-
-
+		cv::GaussianBlur(image, blur, cv::Size(ksize_,ksize_), increaseSigma);
+		
 		//detect line for each octave image;
 		if(!edLineVec_[octaveCount]->EDline(blur,true)){
 			return -1;
@@ -161,9 +182,10 @@ int LineDescriptor::OctaveKeyLines(cv::Mat & image, ScaleLines &keyLines)
 
 		////////////////////////////////////
 		//down sample the current octave image to get the next octave image
-		image.create((int)(blur.rows/factor), (int)(blur.cols/factor), CV_8UC1);
+		//image.create((int)(blur.rows/factor), (int)(blur.cols/factor), CV_8UC1);
 		
-		sampleUchar(blur.data,image.data, factor, blur.cols,  blur.rows);
+		//sampleUchar(blur.data,image.data, factor, blur.cols,  blur.rows);
+		cv::resize(blur, image, cv::Size(), (1.f/factor), (1.f/factor));
 		preSigma2 = curSigma2;
 		curSigma2 = curSigma2*2;
 	}
@@ -588,6 +610,10 @@ int LineDescriptor::ComputeLBD_(ScaleLines &keyLines)
 				(*desVec) = *(desVec++) * tempS;//desVec[8*i+6] =  desVec[8*i+6] * tempS;
 				(*desVec) = *(desVec++) * tempS;//desVec[8*i+7] =  desVec[8*i+7] * tempS;
 			}
+//			std::cout<<lineIDInScaleVec<<std::endl;
+//			
+//			for(int hk= 0; hk < 8; hk++)
+//			    std::cout<<"desVec["<<hk<<"]: "<<*(desVec++)<<std::endl;
 			/*In order to reduce the influence of non-linear illumination,
 			 *a threshold is used to limit the value of element in the unit feature
 			 *vector no larger than this threshold. In Z.Wang's work, a value of 0.4 is found
@@ -608,6 +634,7 @@ int LineDescriptor::ComputeLBD_(ScaleLines &keyLines)
 				desVec[i] =  desVec[i] * temp;
 			}
 		}//end for(short lineIDInSameLine = 0; lineIDInSameLine<sameLineSize; lineIDInSameLine++)
+		
 	}//end for(short lineIDInScaleVec = 0; lineIDInScaleVec<numOfFinalLine; lineIDInScaleVec++)
 
 	delete [] dL;
@@ -623,6 +650,103 @@ int LineDescriptor::ComputeLBD_(ScaleLines &keyLines)
 }
 
 
+unsigned char binaryTest(float* f1, float*f2)
+{
+    uchar result=0;
+    for(int i = 0; i<8; i++)
+    {
+//        std::cout<<"f1[: "<<i<<"]: "<<f1[i];
+//        std::cout<<" -- f2[: "<<i<<"]: "<<f2[i]<<std::endl;
+        if(f1[i]>f2[i])
+        {
+//            std::cout<< " ------  1  ------- "<<std::endl;
+            result+=get2Pow(i);
+        }
+        else
+        {
+//            std::cout<< " ------  0  ------- "<<std::endl;
+        }
+    }
+    
+    return result;
+        
+}
+
+unsigned char binaryIndexTest(int f1, int f2, std::vector<float>& desc)
+{
+    uchar result=0;
+    for(int i = 0; i<8; i++)
+    {
+//        std::cout<<"f1[: "<<i<<"]: "<<f1[i];
+//        std::cout<<" -- f2[: "<<i<<"]: "<<f2[i]<<std::endl;
+        if(desc[i+f1]>desc[i+f2])
+        {
+//            std::cout<< " ------  1  ------- "<<std::endl;
+            result+=get2Pow(i);
+        }
+        else
+        {
+//            std::cout<< " ------  0  ------- "<<std::endl;
+        }
+    }
+    
+    return result;
+        
+}
+
+void LineDescriptor::GetLineBinaryDescriptor(cv::Mat & binaryDescMat, ScaleLines & keyLines)
+{
+// TODO devi fare un insieme di descrittori per ogni scala
+//    quindi avrai un vettore di matrici dove ogni matrice è un insieme di descittori per una scala
+// ad ogni riga della matrice c'è un descrittore di una linea
+    
+    int rows_size = 0;
+    for(int offsetKeyLines = 0; offsetKeyLines<keyLines.size(); offsetKeyLines++)
+            for(int offsetOctave = 0; offsetOctave<keyLines[offsetKeyLines].size(); offsetOctave++)
+                    rows_size++;
+    
+    binaryDescMat.create(rows_size, 32, CV_8UC1); 
+//    uchar * binaryMat_p = binaryDescMat.ptr();
+//    for(int offsetKeyLines = 0; offsetKeyLines<keyLines.size(); offsetKeyLines++)
+//        for(int offsetOctave = 0; offsetOctave<keyLines[offsetKeyLines].size(); offsetOctave++)
+//        {
+//            float * desVec = keyLines[offsetKeyLines][offsetOctave].descriptor.data();
+//            for(int comb = 0; comb < 32; comb++)
+//            {
+////                std::cout<<" COMBINATION : "<<comb<<std::endl;
+//                *binaryMat_p =  binaryTest(&desVec[combinations[comb][0]], &desVec[combinations[comb][1]]);
+////                cv::imshow("binMat",binaryDescriptors);
+////                writeMat(binaryDescriptors, "binaryMat",0);
+////                cv::waitKey();
+//                binaryMat_p++;
+//            }
+//            
+//        }
+    int row = 0;
+    for(int offsetKeyLines = 0; offsetKeyLines<keyLines.size(); offsetKeyLines++)
+        for(int offsetOctave = 0; offsetOctave<keyLines[offsetKeyLines].size(); offsetOctave++)
+        {
+            std::vector<float> desVec = keyLines[offsetKeyLines][offsetOctave].descriptor;
+            for(int comb = 0; comb < 32; comb++)
+            {
+//                std::cout<<" COMBINATION : "<<comb<<std::endl;
+//                *binaryMat_p =  binaryIndexTest(combinations[comb][0], combinations[comb][1], desVec);
+                //std::cout<<"32*row + comb:"<<32*row + comb<<std::endl;
+                binaryDescMat.data[32*row + comb] =  binaryIndexTest(combinations[comb][0], combinations[comb][1], desVec);
+//                cv::imshow("binMat",binaryDescriptors);
+//                writeMat(binaryDescriptors, "binaryMat",0);
+//                cv::waitKey();
+//                binaryMat_p++;
+                
+            }
+            row++;
+            
+        }
+    writeMat(binaryDescMat, "binaryMat",0);
+            
+    
+}
+
 
 int LineDescriptor::GetLineDescriptor(cv::Mat & image, ScaleLines & keyLines)
 {
@@ -635,7 +759,7 @@ int LineDescriptor::GetLineDescriptor(cv::Mat & image, ScaleLines & keyLines)
     std::cout<<"time line extraction: "<<t<<"s"<<std::endl;
     
 //    t = (double)cv::getTickCount();
-//    ComputeLBD_(keyLines);
+    ComputeLBD_(keyLines);
 //    t = ((double)cv::getTickCount() - t)/cv::getTickFrequency();
 //    std::cout<<"time descriptor extraction: "<<t<<"s"<<std::endl;
 //    

@@ -117,18 +117,6 @@ EDLineDetector::~EDLineDetector(){
 	}
 }
 
-void writeMat(cv::Mat m, string name, int n)
-{
-    std::stringstream ss;
-    string s;
-    ss << n;
-    ss >> s;
-    string fileNameConf = name + s;
-    cv::FileStorage fsConf(fileNameConf, cv::FileStorage::WRITE);
-    fsConf << "m" << m;
-
-    fsConf.release();
-}
 
 int EDLineDetector::EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smoothed )
 {
@@ -196,7 +184,7 @@ int EDLineDetector::EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smo
 	
 	//compute gradient and direction images
 
-	double t = (double)cv::getTickCount();
+//	double t = (double)cv::getTickCount();
 	cv::Mat dxABS_m = cv::abs(dxImg_);
 	cv::Mat dyABS_m = cv::abs(dyImg_);
 	cv::Mat sumDxDy;
@@ -208,8 +196,8 @@ int EDLineDetector::EdgeDrawing(cv::Mat &image, EdgeChains &edgeChains, bool smo
 	gImgWO_ = sumDxDy/4;
 	cv::compare(dxABS_m, dyABS_m, dirImg_, cv::CMP_LT);
 
-	t = ((double)cv::getTickCount() - t)/cv::getTickFrequency();
-	std::cout<<"FOR ABS: "<<t<<"s"<<std::endl;
+//	t = ((double)cv::getTickCount() - t)/cv::getTickFrequency();
+//	std::cout<<"FOR ABS: "<<t<<"s"<<std::endl;
 	
 	short *pdxImg = dxImg_.ptr<short>();
 	short *pdyImg = dyImg_.ptr<short>();

@@ -69,6 +69,7 @@ public:
 	int OctaveKeyLines(cv::Mat & image, ScaleLines &keyLines);
   int GetLineDescriptor(cv::Mat & image,
   		ScaleLines &keyLines);
+  void GetLineBinaryDescriptor(cv::Mat & binaryDescMat, ScaleLines & keyLines);
   int MatchLineByDescriptor(ScaleLines &keyLinesLeft, ScaleLines &keyLinesRight,
   		std::vector<short> &matchLeft, std::vector<short> &matchRight,
   		int criteria=NNDR);

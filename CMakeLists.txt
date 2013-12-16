@@ -25,8 +25,10 @@ SET(CMAKE_MODULE_PATH $ENV{CMAKE_MODULE_PATH})
   
 #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${BIAS_CXX_FLAGS} -O0 -ggdb -std=c++11")
 #SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  ${BIAS_C_FLAGS} -O0 -ggdb -std=c++11")
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O3") #-fno-omit-frame-pointer")
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -O3") #-fno-omit-frame-pointer")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -ggdb -fno-omit-frame-pointer")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -ggdb -fno-omit-frame-pointer")
+#SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O3")
+#SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -O3")
 
 # source files of library "LineMatchingLib" to be created
 SET(LineMatchingLib_SRCS

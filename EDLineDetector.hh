@@ -85,6 +85,20 @@ struct EDLineParam{
 #define M_LN10   2.30258509299404568402
 #define log_gamma(x)    ((x)>15.0?log_gamma_windschitl(x):log_gamma_lanczos(x))
 
+
+inline void writeMat(cv::Mat m, std::string name, int n)
+{
+    std::stringstream ss;
+    std::string s;
+    ss << n;
+    ss >> s;
+    std::string fileNameConf = name + s;
+    cv::FileStorage fsConf(fileNameConf, cv::FileStorage::WRITE);
+    fsConf << "m" << m;
+
+    fsConf.release();
+}
+
 /* This class is used to detect lines from input image.
  * First, edges are extracted from input image following the method presented in Cihan Topal and
  * Cuneyt Akinlar's paper:"Edge Drawing: A Heuristic Approach to Robust Real-Time Edge Detection", 2010.

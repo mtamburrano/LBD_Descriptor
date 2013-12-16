@@ -53,6 +53,50 @@ void usage(int argc, char** argv){
 	cout<<"Usage: "<<argv[0]<<"  image1.png"<<"  image2.png"<<endl;
 }
 
+unsigned int factorial(unsigned int x)
+{
+    unsigned int value = 1;
+
+    for(unsigned int i = 2; i <= x; i++)
+    {
+        value = value * i;
+    }
+
+    return value;
+}
+
+void calcEasyCombination(unsigned int n)
+{   
+    int num_combinations = factorial(n)/(factorial(n-2)*2);
+    
+    unsigned int results [num_combinations][2];
+    unsigned int a, b, index = 0;
+    for(int i = 0; i<n-1; i++)
+    {
+        a = i;
+        for(int j = i+1; j<n; j++)
+        {
+            b = j;
+            results[index][0]=a;
+            results[index][1]=b;
+            std::cout<<index<<std::endl;
+            index++;
+        }
+    }
+    
+    std::cout<<"unsigned int combinations [num_combinations][2] = {";
+    for(int i = 0; i<num_combinations; i++)
+    {
+        if(i != num_combinations -1)
+            std::cout<<"{"<<results[i][0]<<","<<results[i][1]<<"},";
+        else
+            std::cout<<"{"<<results[i][0]<<","<<results[i][1]<<"}};"<<std::endl;
+    }
+
+    //unsigned int combinations [36][2] = {{0,1},{0,2},{0,3},{0,4},{0,5},{0,6},{0,7},{0,8},{1,2},{1,3},{1,4},{1,5},{1,6},{1,7},{1,8},{2,3},{2,4},{2,5},{2,6},{2,7},{2,8},{3,4},{3,5},{3,6},{3,7},{3,8},{4,5},{4,6},{4,7},{4,8},{5,6},{5,7},{5,8},{6,7},{6,8},{7,8}};
+    
+}
+
 
 int main(int argc, char** argv)
 {
@@ -61,6 +105,9 @@ int main(int argc, char** argv)
 		usage(argc,argv);
 		return ret;
 	}
+	
+	//calcEasyCombination(9);
+	
   //load first image from file
 	std::string imageName1(argv[1]);
 	cv::Mat leftImage;
@@ -109,9 +156,24 @@ int main(int argc, char** argv)
 	std::vector<unsigned int> matchResult;
 
 
+//	for(int h = 0; h<10; h++)
+//	{
+////	    cv::imshow("PRIMA",leftImage);
+//	    //cv::Mat m = rightImage.clone();
+//	    lineDesc.GetLineDescriptor(rightImage,linesInLeft);
+////	    cv::imshow("DOPO",leftImage);
+////	    cv::waitKey();
+//	}
+//	return 1;
+//	
+
+	cv::Mat binaryDescriptors;
+	
+	std::cout<<"leftImage.cols: "<<leftImage.cols<<"leftImage.rows: "<<leftImage.rows<<std::endl;
+	
 	lineDesc.GetLineDescriptor(leftImage,linesInLeft);
 	lineDesc.GetLineDescriptor(rightImage,linesInRight);
-	
+	lineDesc.GetLineBinaryDescriptor(binaryDescriptors, linesInLeft);
 	//TODO remove BIAS dependecies in PairwiseMatching
 //	lineMatch.LineMatching(linesInLeft,linesInRight,matchResult);
 
