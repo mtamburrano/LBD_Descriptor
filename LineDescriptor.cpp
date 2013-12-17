@@ -587,37 +587,40 @@ int LineDescriptor::ComputeLBD_(ScaleLines &keyLines)
 			tempM = 0;
 			tempS = 0;
 			desVec = pSingleLine->descriptor.data();
-			for(short i=0; i<numOfBand_; i++){
-				tempM += (*desVec) * *(desVec++);//desVec[8*i+0] * desVec[8*i+0];
-				tempM += (*desVec) * *(desVec++);//desVec[8*i+1] * desVec[8*i+1];
-				tempM += (*desVec) * *(desVec++);//desVec[8*i+2] * desVec[8*i+2];
-				tempM += (*desVec) * *(desVec++);//desVec[8*i+3] * desVec[8*i+3];
-				tempS += (*desVec) * *(desVec++);//desVec[8*i+4] * desVec[8*i+4];
-				tempS += (*desVec) * *(desVec++);//desVec[8*i+5] * desVec[8*i+5];
-				tempS += (*desVec) * *(desVec++);//desVec[8*i+6] * desVec[8*i+6];
-				tempS += (*desVec) * *(desVec++);//desVec[8*i+7] * desVec[8*i+7];
+
+			int base = 0;
+			for(short i=0; i<numOfBand_*8; ++base, i=base*8){
+				tempM += *(desVec+i) * *(desVec+i);//desVec[8*i+0] * desVec[8*i+0];
+				tempM += *(desVec+i+1) * *(desVec+i+1);//desVec[8*i+1] * desVec[8*i+1];
+				tempM += *(desVec+i+2) * *(desVec+i+2);//desVec[8*i+2] * desVec[8*i+2];
+				tempM += *(desVec+i+3) * *(desVec+i+3);//desVec[8*i+3] * desVec[8*i+3];
+				tempS += *(desVec+i+4) * *(desVec+i+4);//desVec[8*i+4] * desVec[8*i+4];
+				tempS += *(desVec+i+5) * *(desVec+i+5);//desVec[8*i+5] * desVec[8*i+5];
+				tempS += *(desVec+i+6) * *(desVec+i+6);//desVec[8*i+6] * desVec[8*i+6];
+				tempS += *(desVec+i+7) * *(desVec+i+7);//desVec[8*i+7] * desVec[8*i+7];
 			}
 			tempM = 1/sqrt(tempM);
 			tempS = 1/sqrt(tempS);
 			desVec = pSingleLine->descriptor.data();
-			for(short i=0; i<numOfBand_; i++){
-				(*desVec) = *(desVec++) * tempM;//desVec[8*i] =  desVec[8*i] * tempM;
-				(*desVec) = *(desVec++) * tempM;//desVec[8*i+1] =  desVec[8*i+1] * tempM;
-				(*desVec) = *(desVec++) * tempM;//desVec[8*i+2] =  desVec[8*i+2] * tempM;
-				(*desVec) = *(desVec++) * tempM;//desVec[8*i+3] =  desVec[8*i+3] * tempM;
-				(*desVec) = *(desVec++) * tempS;//desVec[8*i+4] =  desVec[8*i+4] * tempS;
-				(*desVec) = *(desVec++) * tempS;//desVec[8*i+5] =  desVec[8*i+5] * tempS;
-				(*desVec) = *(desVec++) * tempS;//desVec[8*i+6] =  desVec[8*i+6] * tempS;
-				(*desVec) = *(desVec++) * tempS;//desVec[8*i+7] =  desVec[8*i+7] * tempS;
+			base = 0;
+			for(short i=0; i<numOfBand_*8; ++base, i=base*8){
+				*(desVec+i) = *(desVec+i) * tempM;//desVec[8*i] =  desVec[8*i] * tempM;
+				*(desVec+1+i) = *(desVec+1+i) * tempM;//desVec[8*i+1] =  desVec[8*i+1] * tempM;
+				*(desVec+2+i) = *(desVec+2+i) * tempM;//desVec[8*i+2] =  desVec[8*i+2] * tempM;
+				*(desVec+3+i) = *(desVec+3+i) * tempM;//desVec[8*i+3] =  desVec[8*i+3] * tempM;
+				*(desVec+4+i) = *(desVec+4+i) * tempS;//desVec[8*i+4] =  desVec[8*i+4] * tempS;
+				*(desVec+5+i) = *(desVec+5+i) * tempS;//desVec[8*i+5] =  desVec[8*i+5] * tempS;
+				*(desVec+6+i) = *(desVec+6+i) * tempS;//desVec[8*i+6] =  desVec[8*i+6] * tempS;
+				*(desVec+7+i) = *(desVec+7+i) * tempS;//desVec[8*i+7] =  desVec[8*i+7] * tempS;
 			}
-//			std::cout<<lineIDInScaleVec<<std::endl;
-//			
-//			for(int hk= 0; hk < 8; hk++)
-//			    std::cout<<"desVec["<<hk<<"]: "<<*(desVec++)<<std::endl;
+
 			/*In order to reduce the influence of non-linear illumination,
 			 *a threshold is used to limit the value of element in the unit feature
 			 *vector no larger than this threshold. In Z.Wang's work, a value of 0.4 is found
 			 *empirically to be a proper threshold.*/
+			
+			
+			
 			desVec = pSingleLine->descriptor.data();
 			for(short i=0; i<descriptorSize; i++ ){
 				if(desVec[i]>0.4){
@@ -706,42 +709,19 @@ void LineDescriptor::GetLineBinaryDescriptor(cv::Mat & binaryDescMat, ScaleLines
                     rows_size++;
     
     binaryDescMat.create(rows_size, 32, CV_8UC1); 
-//    uchar * binaryMat_p = binaryDescMat.ptr();
-//    for(int offsetKeyLines = 0; offsetKeyLines<keyLines.size(); offsetKeyLines++)
-//        for(int offsetOctave = 0; offsetOctave<keyLines[offsetKeyLines].size(); offsetOctave++)
-//        {
-//            float * desVec = keyLines[offsetKeyLines][offsetOctave].descriptor.data();
-//            for(int comb = 0; comb < 32; comb++)
-//            {
-////                std::cout<<" COMBINATION : "<<comb<<std::endl;
-//                *binaryMat_p =  binaryTest(&desVec[combinations[comb][0]], &desVec[combinations[comb][1]]);
-////                cv::imshow("binMat",binaryDescriptors);
-////                writeMat(binaryDescriptors, "binaryMat",0);
-////                cv::waitKey();
-//                binaryMat_p++;
-//            }
-//            
-//        }
-    int row = 0;
+    uchar * binaryMat_p = binaryDescMat.ptr();
     for(int offsetKeyLines = 0; offsetKeyLines<keyLines.size(); offsetKeyLines++)
         for(int offsetOctave = 0; offsetOctave<keyLines[offsetKeyLines].size(); offsetOctave++)
         {
-            std::vector<float> desVec = keyLines[offsetKeyLines][offsetOctave].descriptor;
+            float * desVec = keyLines[offsetKeyLines][offsetOctave].descriptor.data();
             for(int comb = 0; comb < 32; comb++)
             {
-//                std::cout<<" COMBINATION : "<<comb<<std::endl;
-//                *binaryMat_p =  binaryIndexTest(combinations[comb][0], combinations[comb][1], desVec);
-                //std::cout<<"32*row + comb:"<<32*row + comb<<std::endl;
-                binaryDescMat.data[32*row + comb] =  binaryIndexTest(combinations[comb][0], combinations[comb][1], desVec);
-//                cv::imshow("binMat",binaryDescriptors);
-//                writeMat(binaryDescriptors, "binaryMat",0);
-//                cv::waitKey();
-//                binaryMat_p++;
-                
+                *binaryMat_p =  binaryTest(&desVec[combinations[comb][0]], &desVec[combinations[comb][1]]);
+                binaryMat_p++;
             }
-            row++;
             
         }
+
     writeMat(binaryDescMat, "binaryMat",0);
             
     
@@ -757,6 +737,29 @@ int LineDescriptor::GetLineDescriptor(cv::Mat & image, ScaleLines & keyLines)
     }
     t = ((double)cv::getTickCount() - t)/cv::getTickFrequency();
     std::cout<<"time line extraction: "<<t<<"s"<<std::endl;
+    
+//    for(int j = 0; j<keyLines.size(); j++)
+//    {
+//        for(int k = 0; k<keyLines[j].size(); k++)
+//        {
+//            OctaveSingleLine singleLine = keyLines[j][k];
+//            std::cout<<"-----------["<<j<<"]["<<k<<"]--------------"<<std::endl;
+//            std::cout<<"singleLine.octaveCount :"<<singleLine.octaveCount<<std::endl;
+//            std::cout<<"singleLine.direction :"<<singleLine.direction<<std::endl;
+//            std::cout<<"singleLine.lineLength :"<<singleLine.lineLength<<std::endl;
+//            std::cout<<"singleLine.salience :"<<singleLine.salience<<std::endl;
+//            std::cout<<"singleLine.numOfPixels :"<<singleLine.numOfPixels<<std::endl;
+//            std::cout<<"singleLine.sPointInOctaveX :"<<singleLine.sPointInOctaveX<<std::endl;
+//            std::cout<<"singleLine.sPointInOctaveY :"<<singleLine.sPointInOctaveY<<std::endl;
+//            std::cout<<"singleLine.ePointInOctaveX :"<<singleLine.ePointInOctaveX<<std::endl;
+//            std::cout<<"singleLine.ePointInOctaveY :"<<singleLine.ePointInOctaveY<<std::endl;
+//            std::cout<<"singleLine.startPointX :"<<singleLine.startPointX<<std::endl;
+//            std::cout<<"singleLine.startPointY :"<<singleLine.startPointY<<std::endl;
+//            std::cout<<"singleLine.endPointX :"<<singleLine.endPointX<<std::endl;
+//            std::cout<<"singleLine.endPointY :"<<singleLine.endPointY<<std::endl;
+//            std::cout<<"--------------------------------"<<std::endl;
+//         }
+//    }
     
 //    t = (double)cv::getTickCount();
     ComputeLBD_(keyLines);
