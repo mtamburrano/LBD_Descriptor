@@ -12,6 +12,10 @@ Copyright (C) 2011-2012, Lilian Zhang, all rights reserved.
 Copyright (C) 2013, Manuele Tamburrano, Stefano Fabri, all rights reserved.
 Third party copyrights are property of their respective owners.
 
+To extract edge and lines, this library implements the EDLines Algorithm and the Edge Drawing detector:
+http://www.sciencedirect.com/science/article/pii/S0167865511001772
+http://www.sciencedirect.com/science/article/pii/S1047320312000831
+
 Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
 
